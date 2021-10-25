@@ -1,6 +1,10 @@
 # Video Subtitle Extractor Bot
 
 A simple Telegram bot to extract hard-coded subtitle from videos using FFmpeg & Tesseract.
+
+
+Note that the accuracy of recognition depends on the subtitle font and its visibility.
+
 ## Deploy to Heroku
 
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/samadii/VidSubExtract-Bot)
