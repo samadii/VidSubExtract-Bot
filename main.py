@@ -62,6 +62,7 @@ if not os.path.exists(path):
 
 @Bot.on_message(filters.private & filters.video)
 async def main(bot, m):
+    msg = await m.reply("`Downloading and Extracting...`", parse_mode='md')
     await m.download("temp/vid.mp4")
     sub_count = 0
     repeated_count = 0
@@ -115,6 +116,7 @@ async def main(bot, m):
 
     f.close
     await bot.send_document(chat_id=m.chat.id, document="temp/srt.srt" ,caption=m.video.file_name, file_name=m.video.file_name+".srt")
+    await msg.delete()
     os.remove("temp/srt.srt")
 
 
