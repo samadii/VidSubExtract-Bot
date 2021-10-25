@@ -51,7 +51,7 @@ async def start(bot, update):
 #language data for ocr
 tessdata = f"https://github.com/tesseract-ocr/tessdata/raw/main/{LANG}.traineddata"
 dirs = r"/app/vendor/tessdata"
-path = os.path.join(dirs, f"{lang_code.text}.traineddata")
+path = os.path.join(dirs, LANG+".traineddata")
 if not os.path.exists(path):
     data = requests.get(tessdata, allow_redirects=True, headers={"User-Agent": "Mozilla/5.0"})
     if data.status_code == 200:
