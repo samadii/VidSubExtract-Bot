@@ -10,7 +10,7 @@
       "value": ""
     },
     "SUBTITLE_LANG": {
-      "description": "Add the ISO 639-2 language code. List of ISO 639-2 language codes : https://en.m.wikipedia.org/wiki/List_of_ISO_639-2_codes",
+      "description": "Add the ISO 639-2 language code. List of language codes : https://en.m.wikipedia.org/wiki/List_of_ISO_639-2_codes",
       "value": "eng"
     },
     "BOT_TOKEN": {
