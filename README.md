@@ -19,7 +19,7 @@ Note that the accuracy of recognition depends on the subtitle font and its visib
 
 2. Install [Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) and [FFmpeg](www.ffmpeg.org). 
    
-3. Go to [this line](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L9) and fill the inverted commas with the PATH where Tesseract is installed.
+3. Go to [this line](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L9) and add the PATH where Tesseract is installed.
 
 4. Also fill [this path](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L53) with the path of the tessdata folder.
    
