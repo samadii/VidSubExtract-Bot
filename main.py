@@ -23,8 +23,10 @@ Bot = Client(
 
 START_TXT = """
 Hi {}
-I am subtitle extractor Bot.
+I am Subtitle Extractor Bot.
+
 > `I can extract hard-coded subtitle from videos.`
+
 Send me a video to get started.
 """
 
