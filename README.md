@@ -21,7 +21,7 @@ Note that the accuracy of recognition depends on the subtitle font and its visib
    
 3. Go to [this line](https://github.com/samadii/VidSubExtract-Bot/blob/main/main.py#L9) and fill the inverted commas with the PATH where Tesseract is installed.
 
-4. Also fill [this path](https://github.com/samadii/VidSubExtract-Bot/blob/main/main.py#L51) with the path of the tessdata folder.
+4. Also fill [this path](https://github.com/samadii/VidSubExtract-Bot/blob/main/main.py#L53) with the path of the tessdata folder.
    
 5. Enter the directory
    ```
