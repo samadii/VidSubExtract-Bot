@@ -83,10 +83,10 @@ async def main(bot, m):
         if text != None and text[:1].isspace() == False :
             # Check either text is duplicate or not
             commons = list(set(text.rsplit()) & set(last_text.rsplit()))
-            if len(text.rsplit()) < 3 and len(commons) >= 1:
+            if len(text.rsplit()) <= 3 and len(commons) >= 1:
                 duplicate = True
                 repeated_count += 1
-            elif len(text.rsplit()) >= 3 and len(commons) >= 3:
+            elif len(text.rsplit()) > 3 and len(commons) >= 3:
                 duplicate = True
                 repeated_count += 1
             else:
