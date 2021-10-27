@@ -13,6 +13,10 @@
       "description": "Add the ISO 639-2 language code. List of language codes : https://en.m.wikipedia.org/wiki/List_of_ISO_639-2_codes",
       "value": "eng"
     },
+    "USE_CROP": {
+      "description": "Set this to ANYTHING to enable crop mode(crop out subtitles area).",
+      "required": false
+    },
     "BOT_TOKEN": {
       "description": "Your bot token, as a string.",
       "value": ""
