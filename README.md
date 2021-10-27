@@ -19,9 +19,9 @@ Note that the accuracy of recognition depends on the subtitle font and its visib
 
 2. Install [Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) and [FFmpeg](www.ffmpeg.org). 
    
-3. Go to [this line](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L9) and add the PATH where Tesseract is installed.
+3. Go to [this line](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L10) and add the PATH where Tesseract is installed.
 
-4. Also fill [this path](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L53) with the path of the tessdata folder.
+4. Also fill [this path](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L54) with the path of the tessdata folder.
    
 5. Enter the directory
    ```
@@ -44,6 +44,7 @@ Note that the accuracy of recognition depends on the subtitle font and its visib
 - `API_HASH` - Get this from [my.telegram.org](https://my.telegram.org/auth)
 - `BOT_TOKEN` - Get this from [@BotFather](https://t.me/BotFather)
 - `SUBTITLE_LANG` - Get this from [list of ISO 639-2 language codes](https://en.m.wikipedia.org/wiki/List_of_ISO_639-2_codes)
+- `USE_CROP` - Set this to ANYTHING to enable crop mode(crop out subtitles area).
 
 ### Devs: 
 - [@samadii](https://github.com/samadii)
