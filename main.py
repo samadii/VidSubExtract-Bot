@@ -75,6 +75,7 @@ async def main(bot, m):
     for interval in intervals:
         try:
             os.system(f"ffmpeg -ss {interval} -i temp/vid.mp4 -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg")
+
             # Change the color and invert image for better recognition
             #import cv2  # Install opencv-python-headless
             #im = cv2.imread("temp/output.jpg")
@@ -95,8 +96,6 @@ async def main(bot, m):
                 im = im.crop(crop_area)  # Learn how to change crop parameters: https://stackoverflow.com/a/39424357
                 #im.show()
                 im.save("temp/output.jpg")
-            if interval == 0:
-                await m.reply_photo(photo="temp/output.jpg")
             text = pytesseract.image_to_string("temp/output.jpg", LANG)
         except MessageEmpty:
             text = None
