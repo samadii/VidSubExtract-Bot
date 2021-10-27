@@ -1,9 +1,10 @@
 import requests
 import numpy as np
 import os, datetime
+import pytesseract
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-import pytesseract
+from pyrogram.errors import MessageEmpty
 from PIL import Image
 
 #pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -12,7 +13,8 @@ from PIL import Image
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 API_ID = os.environ.get("API_ID")
 API_HASH = os.environ.get("API_HASH")
-LANG = os.environ.get("SUBTITLE_LANG")
+LANG = os.environ.get("SUBTITLE_LANG") #Get this from https://en.m.wikipedia.org/wiki/List_of_ISO_639-2_codes
+USE_CROP = os.environ.get("USE_CROP") #[Optional] Set to ANYTHING to enable crop mode
 
 Bot = Client(
     "Bot",
@@ -47,7 +49,6 @@ async def start(bot, update):
         reply_markup=reply_markup
     )
 
-
 #language data for ocr
 tessdata = f"https://github.com/tesseract-ocr/tessdata/raw/main/{LANG}.traineddata"
 dirs = r"/app/vendor/tessdata"
@@ -68,17 +69,40 @@ async def main(bot, m):
     repeated_count = 0
     last_text = " "
     duplicate = True
-    lastsub_time = None
+    lastsub_time = 0
     intervals = [round(num, 2) for num in np.linspace(0,m.video.duration,(m.video.duration-0)*int(1/0.1)+1).tolist()]
     # Extract frames every 100 milliseconds for ocr
     for interval in intervals:
         try:
-            os.system(f"ffmpeg -ss {interval} -i temp/vid.mp4 -vframes 1 -q:v 2 -y temp/output.jpg")
-            im = Image.open("temp/output.jpg")
-            text = pytesseract.image_to_string(im, LANG)
-        except:
+            os.system(f"ffmpeg -ss {interval} -i temp/vid.mp4 -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg")
+            # Change the color and invert image for better recognition
+            #import cv2  # Install opencv-python-headless
+            #im = cv2.imread("temp/output.jpg")
+            #im = cv2.cvtColor(im, cv2.COLOR_BGR2LUV)
+            #cv2.imwrite("temp/output.jpg", im)
+            #import PIL.ImageOps
+            #im = PIL.ImageOps.invert(im)
+            #im.save("temp/output.jpg")
+
+            if USE_CROP:
+                im = Image.open("temp/output.jpg")
+                width, height = im.size
+                x1 = str(width/7)
+                y1 = str(3*(height/4))
+                x2 = str(6*(width/7))
+                y2 = height
+                crop_area = (int(x1.split('.')[0]), int(y1.split('.')[0]), int(x2.split('.')[0]), y2)
+                im = im.crop(crop_area)  # Learn how to change crop parameters: https://stackoverflow.com/a/39424357
+                #im.show()
+                im.save("temp/output.jpg")
+            if interval == 0:
+                await m.reply_photo(photo="temp/output.jpg")
+            text = pytesseract.image_to_string("temp/output.jpg", LANG)
+        except MessageEmpty:
             text = None
             pass
+        except Exception as e:
+            return print(e)
 
         if text != None and text[:1].isspace() == False :
             # Check either text is duplicate or not
