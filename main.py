@@ -76,7 +76,7 @@ async def main(bot, m):
         try:
             os.system(f"ffmpeg -ss {interval} -i temp/vid.mp4 -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg")
 
-            #Maybe make better recognition
+            #Probably makes better recognition
             """
             import cv2  #Install opencv-python-headless
             im = cv2.imread("temp/output.jpg")
