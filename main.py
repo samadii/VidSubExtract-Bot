@@ -95,9 +95,9 @@ async def main(bot, m):
                 x2 = str(6*(width/7))
                 y2 = height
                 crop_area = (int(x1.split('.')[0]), int(y1.split('.')[0]), int(x2.split('.')[0]), y2)
-                im = im.crop(crop_area)  # Learn how to change crop parameters: https://stackoverflow.com/a/39424357
-                #im.show()
-                im.save("temp/output.jpg")
+                cropped = im.crop(crop_area)  # Learn how to change crop parameters: https://stackoverflow.com/a/39424357
+                #cropped.show()
+                cropped.save("temp/output.jpg")
             text = pytesseract.image_to_string("temp/output.jpg", LANG)
         except MessageEmpty:
             text = None
