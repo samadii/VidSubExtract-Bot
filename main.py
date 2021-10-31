@@ -79,23 +79,23 @@ async def main(bot, m):
             #Probably makes better recognition
             """
             import cv2  #Install opencv-python-headless
-            im = cv2.imread("temp/output.jpg")
-            im = cv2.cvtColor(im, cv2.COLOR_BGR2LUV)
-            cv2.imwrite("temp/output.jpg", im)
+            img = cv2.imread("temp/output.jpg")
+            img = cv2.cvtColor(im, cv2.COLOR_BGR2LUV)
+            cv2.imwrite("temp/output.jpg", img)
             import PIL.ImageOps
-            im = PIL.ImageOps.invert(im)
-            im.save("temp/output.jpg")
+            img = PIL.ImageOps.invert(img)
+            img.save("temp/output.jpg")
             """
 
             if USE_CROP:
-                im = Image.open("temp/output.jpg")
-                width, height = im.size
-                x1 = str(width/7)
-                y1 = str(3*(height/4))
-                x2 = str(6*(width/7))
+                img = Image.open("temp/output.jpg")
+                width, height = img.size
+                x1 = str(width/7).split('.')[0]
+                y1 = str(3*(height/4)).split('.')[0]
+                x2 = str(6*(width/7)).split('.')[0]
                 y2 = height
-                crop_area = (int(x1.split('.')[0]), int(y1.split('.')[0]), int(x2.split('.')[0]), y2)
-                cropped = im.crop(crop_area)  # Learn how to change crop parameters: https://stackoverflow.com/a/39424357
+                crop_area = (int(x1), int(y1), int(x2), y2)
+                cropped = img.crop(crop_area) # Learn how to change crop parameters: https://stackoverflow.com/a/39424357
                 #cropped.show()
                 cropped.save("temp/output.jpg")
             text = pytesseract.image_to_string("temp/output.jpg", LANG)
