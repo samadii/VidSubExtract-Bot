@@ -103,7 +103,8 @@ async def main(bot, m):
             text = None
             pass
         except Exception as e:
-            return print(e)
+            print(e)
+            pass
 
         if text != None and text[:1].isspace() == False :
             # Check either text is duplicate or not
@@ -126,6 +127,8 @@ async def main(bot, m):
                 sub_count += 1
                 from_time = str(datetime.datetime.fromtimestamp(interval-0.1-repeated_count*0.1)+datetime.timedelta(hours=0)).split(' ')[1][:12]
                 to_time = str(datetime.datetime.fromtimestamp(interval)+datetime.timedelta(hours=0)).split(' ')[1][:12]
+                from_time = f"{from_time}.000" if not "." in from_time else from_time
+                to_time = f"{to_time}.000" if not "." in to_time else to_time
                 f = open("temp/srt.srt", "a+", encoding="utf-8")
                 f.write(str(sub_count) + "\n" + from_time + " --> " + to_time + "\n" + last_text + "\n\n")
                 duplicate = True
@@ -136,6 +139,8 @@ async def main(bot, m):
         if interval == m.video.duration:
             ftime = str(datetime.datetime.fromtimestamp(lastsub_time)+datetime.timedelta(hours=0)).split(' ')[1][:12]
             ttime = str(datetime.datetime.fromtimestamp(lastsub_time+10)+datetime.timedelta(hours=0)).split(' ')[1][:12]
+            ftime = f"{ftime}.000" if not "." in ftime else ftime
+            ttime = f"{ttime}.000" if not "." in ttime else ttime
             f = open("temp/srt.srt", "a+", encoding="utf-8")
             f.write(str(sub_count+1) + "\n" + ftime + " --> " + ttime + "\n" + last_text + "\n\n")
 
