@@ -52,7 +52,7 @@ async def start(bot, update):
 #language data for ocr
 tessdata = f"https://github.com/tesseract-ocr/tessdata/raw/main/{LANG}.traineddata"
 dirs = r"/app/vendor/tessdata"
-path = os.path.join(dirs, LANG+".traineddata")
+path = os.path.join(dirs, f"{LANG}.traineddata")
 if not os.path.exists(path):
     data = requests.get(tessdata, allow_redirects=True, headers={"User-Agent": "Mozilla/5.0"})
     if data.status_code == 200:
@@ -90,11 +90,11 @@ async def main(bot, m):
             if USE_CROP:
                 img = Image.open("temp/output.jpg")
                 width, height = img.size
-                x1 = str(width/7).split('.')[0]
-                y1 = str(3*(height/4)).split('.')[0]
-                x2 = str(6*(width/7)).split('.')[0]
+                x1 = width // 7
+                y1 = 3 * (height // 4)
+                x2 = 6 * (width // 7)
                 y2 = height
-                crop_area = (int(x1), int(y1), int(x2), y2)
+                crop_area = (x1, y1, x2, y2)
                 cropped = img.crop(crop_area) # Learn how to change crop parameters: https://stackoverflow.com/a/39424357
                 #cropped.show()
                 cropped.save("temp/output.jpg")
