@@ -1,6 +1,7 @@
 import requests
+import subprocess
 import numpy as np
-import os, datetime
+import os, datetime, json
 import pytesseract
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -68,6 +69,12 @@ async def main(bot, m):
     media = m.video or m.document
     msg = await m.reply("`Downloading and Extracting...`", parse_mode='md')
     file_dl_path = await bot.download_media(message=m, file_name="temp/")
+    if m.video:
+        duration = m.video.duration
+    else:
+        video_info = subprocess.check_output(f'ffprobe -v quiet -show_streams -select_streams v:0 -of json "{file_dl_path}"', shell=True).decode()
+        fields = json.loads(video_info)['streams'][0]
+        duration = int(fields['duration'].split(".")[0])
     sub_count = 0
     repeated_count = 0
     last_text = " "
