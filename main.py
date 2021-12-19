@@ -1,8 +1,9 @@
 import requests
 import subprocess
 import numpy as np
-import os, datetime, json
+import os, datetime, json, time
 import pytesseract
+from display_progress import progress_for_pyrogram
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import MessageEmpty
@@ -67,8 +68,10 @@ async def main(bot, m):
     if m.document and not m.document.mime_type.startswith("video/"):
         return
     media = m.video or m.document
-    msg = await m.reply("`Downloading and Extracting...`", parse_mode='md')
-    file_dl_path = await bot.download_media(message=m, file_name="temp/")
+    msg = await m.reply("`Downloading..`", parse_mode='md')
+    c_time = time.time()
+    file_dl_path = await bot.download_media(message=m, file_name="temp/", progress=progress_for_pyrogram, progress_args=("Downloading..", msg, c_time))
+    await msg.edit("`Now Extracting..`", parse_mode='md')
     if m.video:
         duration = m.video.duration
     else:
