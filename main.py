@@ -87,7 +87,7 @@ async def main(bot, m):
     # Extract frames every 100 milliseconds for ocr
     for interval in intervals:
         try:
-            os.system(f"ffmpeg -ss {interval} -i {file_dl_path} -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg")
+            os.system(f'ffmpeg -ss {interval} -i "{file_dl_path}" -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg')
 
             #Probably makes better recognition
             """
