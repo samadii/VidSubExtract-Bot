@@ -1,7 +1,7 @@
 import requests
 import subprocess
 import numpy as np
-import os, datetime, json, time
+import os, datetime, json, time, math
 import pytesseract
 from display_progress import progress_for_pyrogram
 from pyrogram import Client, filters
@@ -58,6 +58,8 @@ async def cancel_progress(_, m):
         await m.reply("can't cancel. maybe there wasn't any progress in process.")
     else:
         await m.reply("canceled successfully.")
+    await m.delete()
+    os.remove("temp/srt.srt")
 
 #language data for ocr
 tessdata = f"https://github.com/tesseract-ocr/tessdata/raw/main/{LANG}.traineddata"
@@ -79,7 +81,7 @@ async def main(bot, m):
     msg = await m.reply("`Downloading..`", parse_mode='md')
     c_time = time.time()
     file_dl_path = await bot.download_media(message=m, file_name="temp/vid.mp4", progress=progress_for_pyrogram, progress_args=("Downloading..", msg, c_time))
-    await msg.edit("`Now Extracting..`\n\n for cancel progress, send /cancel", parse_mode='md')
+    await msg.edit("`Now Extracting..`", parse_mode='md')
     if m.video:
         duration = m.video.duration
     else:
@@ -91,14 +93,16 @@ async def main(bot, m):
     last_text = " "
     duplicate = True
     lastsub_time = 0
+    time_to_finish = duration
     intervals = [round(num, 2) for num in np.linspace(0,duration,(duration-0)*int(1/0.1)+1).tolist()]
     # Extract frames every 100 milliseconds for ocr
     for interval in intervals:
         command = os.system(f'ffmpeg -ss {interval} -i "{file_dl_path}" -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg')
         if command != 0:
+            await msg.delete()
             return
-        try:
 
+        try:
             #Probably makes better recognition
             """
             import cv2  #Install opencv-python
@@ -109,7 +113,6 @@ async def main(bot, m):
             img = PIL.ImageOps.invert(img)
             img.save("temp/output.jpg")
             """
-
             if USE_CROP:
                 img = Image.open("temp/output.jpg")
                 width, height = img.size
@@ -164,6 +167,20 @@ async def main(bot, m):
             ttime = f"{ttime}.000" if not "." in ttime else ttime
             f = open("temp/srt.srt", "a+", encoding="utf-8")
             f.write(str(sub_count+1) + "\n" + ftime + " --> " + ttime + "\n" + last_text + "\n\n")
+
+        # progress bar
+        if time_to_finish > 0:
+            time_to_finish -= 0.1
+            percentage = (duration - time_to_finish) * 100 / duration
+            progress = "`Processing...`\n[{0}{1}]\nPercentage : {2}%\n\n".format(
+                ''.join(["●" for i in range(math.floor(percentage / 5))]),
+                ''.join(["○" for i in range(20 - math.floor(percentage / 5))]),
+                round(percentage, 2)
+            )
+            try:
+                await msg.edit(progress + "`For cancel progress, send` /cancel", parse_mode='md')
+            except:
+                pass
 
     f.close
     await bot.send_document(chat_id=m.chat.id, document="temp/srt.srt" , file_name=media.file_name.rsplit('.', 1)[0]+".srt")
