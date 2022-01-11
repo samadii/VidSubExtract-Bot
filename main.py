@@ -6,7 +6,6 @@ import pytesseract
 from display_progress import progress_for_pyrogram
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import MessageEmpty
 from PIL import Image
 
 #pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -19,7 +18,7 @@ LANG = os.environ.get("SUBTITLE_LANG") #Get this from https://en.m.wikipedia.org
 USE_CROP = os.environ.get("USE_CROP") #[Optional] Set to ANYTHING to enable crop mode
 
 Bot = Client(
-    "Bot",
+    "VidSubExtract-Bot",
     bot_token = BOT_TOKEN,
     api_id = API_ID,
     api_hash = API_HASH
@@ -51,6 +50,15 @@ async def start(bot, update):
         reply_markup=reply_markup
     )
 
+@Bot.on_message(filters.command(["cancel"]))
+async def cancel_progress(_, m):
+    try:
+        os.remove("temp/vid.mp4")
+    except:
+        await m.reply("can't cancel. maybe there wasn't any progress in process.")
+    else:
+        await m.reply("canceled successfully.")
+
 #language data for ocr
 tessdata = f"https://github.com/tesseract-ocr/tessdata/raw/main/{LANG}.traineddata"
 dirs = r"/app/vendor/tessdata"
@@ -70,8 +78,8 @@ async def main(bot, m):
     media = m.video or m.document
     msg = await m.reply("`Downloading..`", parse_mode='md')
     c_time = time.time()
-    file_dl_path = await bot.download_media(message=m, file_name="temp/", progress=progress_for_pyrogram, progress_args=("Downloading..", msg, c_time))
-    await msg.edit("`Now Extracting..`", parse_mode='md')
+    file_dl_path = await bot.download_media(message=m, file_name="temp/vid.mp4", progress=progress_for_pyrogram, progress_args=("Downloading..", msg, c_time))
+    await msg.edit("`Now Extracting..`\n\n for cancel progress, send /cancel", parse_mode='md')
     if m.video:
         duration = m.video.duration
     else:
@@ -87,11 +95,13 @@ async def main(bot, m):
     # Extract frames every 100 milliseconds for ocr
     for interval in intervals:
         try:
-            os.system(f'ffmpeg -ss {interval} -i "{file_dl_path}" -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg')
+            command = os.system(f'ffmpeg -ss {interval} -i "{file_dl_path}" -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg')
+            if command != 0:
+                return
 
             #Probably makes better recognition
             """
-            import cv2  #Install opencv-python-headless
+            import cv2  #Install opencv-python
             img = cv2.imread("temp/output.jpg")
             img = cv2.cvtColor(im, cv2.COLOR_BGR2LUV)
             cv2.imwrite("temp/output.jpg", img)
@@ -112,11 +122,9 @@ async def main(bot, m):
                 #cropped.show()
                 cropped.save("temp/output.jpg")
             text = pytesseract.image_to_string("temp/output.jpg", LANG)
-        except MessageEmpty:
-            text = None
-            pass
         except Exception as e:
             print(e)
+            text = None
             pass
 
         if text != None and text[:1].isspace() == False :
@@ -158,7 +166,7 @@ async def main(bot, m):
             f.write(str(sub_count+1) + "\n" + ftime + " --> " + ttime + "\n" + last_text + "\n\n")
 
     f.close
-    await bot.send_document(chat_id=m.chat.id, document="temp/srt.srt" ,caption=media.file_name, file_name=media.file_name+".srt")
+    await bot.send_document(chat_id=m.chat.id, document="temp/srt.srt" , file_name=media.file_name.rsplit('.', 1)[0]+".srt")
     await msg.delete()
     os.remove(file_dl_path)
     os.remove("temp/srt.srt")
