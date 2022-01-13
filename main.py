@@ -142,7 +142,7 @@ async def main(bot, m):
             else:
                 duplicate = False
 
-            # time of the last dialogue
+            # to store start-time of the lastest dialogue
             if duplicate == False:
                 lastsub_time = interval
                 
@@ -183,9 +183,14 @@ async def main(bot, m):
                 pass
 
     f.close
-    await bot.send_document(chat_id=m.chat.id, document="temp/srt.srt" , file_name=media.file_name.rsplit('.', 1)[0]+".srt")
-    await msg.delete()
     os.remove(file_dl_path)
+    try:
+        await bot.send_document(chat_id=m.chat.id, document="temp/srt.srt" , file_name=media.file_name.rsplit('.', 1)[0]+".srt")
+    except ValueError:
+        return await msg.edit("Not any text detected.")
+    except Exception as e:
+        return await msg.edit("ERROR:\n"+e)
+    await msg.delete()
     os.remove("temp/srt.srt")
 
 
