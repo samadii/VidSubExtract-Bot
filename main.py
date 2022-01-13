@@ -183,14 +183,13 @@ async def main(bot, m):
                 pass
 
     f.close
-    os.remove(file_dl_path)
     try:
         await bot.send_document(chat_id=m.chat.id, document="temp/srt.srt" , file_name=media.file_name.rsplit('.', 1)[0]+".srt")
     except ValueError:
-        return await msg.edit("Not any text detected.")
-    except Exception as e:
-        return await msg.edit("ERROR:\n"+e)
-    await msg.delete()
+        await msg.edit("Not any text detected.")
+    else:
+        await msg.delete()
+    os.remove(file_dl_path)
     os.remove("temp/srt.srt")
 
 
