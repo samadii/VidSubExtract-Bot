@@ -1,12 +1,12 @@
 import requests
-import subprocess
-import numpy as np
-import os, datetime, json, time, math
+import os, datetime, json, time, math, subprocess
 import pytesseract
 from display_progress import progress_for_pyrogram
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from PIL import Image
+
+
 
 #pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
@@ -94,10 +94,10 @@ async def main(bot, m):
     duplicate = True
     lastsub_time = 0
     time_to_finish = duration
-    intervals = [round(num, 2) for num in np.linspace(0,duration,(duration-0)*int(1/0.1)+1).tolist()]
+    intervals = get_intervals(duration)
     # Extract frames every 100 milliseconds for ocr
     for interval in intervals:
-        command = os.system(f'ffmpeg -ss {interval} -i "{file_dl_path}" -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg')
+        command = os.system(f'ffmpeg -ss {ms_to_time(interval)} -i "{file_dl_path}" -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg')
         if command != 0:
             await msg.delete()
             return
@@ -107,7 +107,7 @@ async def main(bot, m):
             """
             import cv2  #Install opencv-python
             img = cv2.imread("temp/output.jpg")
-            img = cv2.cvtColor(im, cv2.COLOR_BGR2LUV)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2LUV)
             cv2.imwrite("temp/output.jpg", img)
             import PIL.ImageOps
             img = PIL.ImageOps.invert(img)
@@ -149,10 +149,8 @@ async def main(bot, m):
             # Write the dialogues text
             if repeated_count != 0 and duplicate == False:
                 sub_count += 1
-                from_time = str(datetime.datetime.fromtimestamp(interval-0.1-repeated_count*0.1)+datetime.timedelta(hours=0)).split(' ')[1][:12]
-                to_time = str(datetime.datetime.fromtimestamp(interval)+datetime.timedelta(hours=0)).split(' ')[1][:12]
-                from_time = f"{from_time}.000" if not "." in from_time else from_time
-                to_time = f"{to_time}.000" if not "." in to_time else to_time
+                from_time = ms_to_time(interval-100-(repeated_count*100))
+                to_time = ms_to_time(interval)
                 f = open("temp/srt.srt", "a+", encoding="utf-8")
                 f.write(str(sub_count) + "\n" + from_time + " --> " + to_time + "\n" + last_text + "\n\n")
                 duplicate = True
@@ -160,11 +158,9 @@ async def main(bot, m):
             last_text = text
 
         # Write the last dialogue
-        if interval == duration:
-            ftime = str(datetime.datetime.fromtimestamp(lastsub_time)+datetime.timedelta(hours=0)).split(' ')[1][:12]
-            ttime = str(datetime.datetime.fromtimestamp(lastsub_time+10)+datetime.timedelta(hours=0)).split(' ')[1][:12]
-            ftime = f"{ftime}.000" if not "." in ftime else ftime
-            ttime = f"{ttime}.000" if not "." in ttime else ttime
+        if interval/1000 == duration:
+            ftime = ms_to_time(lastsub_time)
+            ttime = ms_to_time(lastsub_time+10000)
             f = open("temp/srt.srt", "a+", encoding="utf-8")
             f.write(str(sub_count+1) + "\n" + ftime + " --> " + ttime + "\n" + last_text + "\n\n")
 
@@ -191,6 +187,21 @@ async def main(bot, m):
         await msg.delete()
     os.remove(file_dl_path)
     os.remove("temp/srt.srt")
+
+
+def get_intervals(duration):
+    intervals = []
+    for i in range(0, duration+1):
+        for x in range(0, 10):
+            interval = (i+(x/10))*1000
+            intervals.append(interval)
+    return intervals
+
+
+def ms_to_time(interval):
+    ms2time = "0" + str(datetime.timedelta(milliseconds=interval))[:11]
+    ms2time = f"{ms2time}.000" if not "." in ms2time else ms2time
+    return ms2time
 
 
 Bot.run()
