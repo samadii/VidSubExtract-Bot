@@ -3,7 +3,7 @@
 A simple Telegram bot to extract hard-coded subtitle from videos using FFmpeg & Tesseract.
 
 
-Note that the accuracy of recognition depends on the subtitle font and its visibility.
+Note that the recognition accuracy depends on the subtitle font and its visibility.
 
 ## Deploy to Heroku
 
@@ -12,13 +12,13 @@ Note that the accuracy of recognition depends on the subtitle font and its visib
 
 ## Local Deploying
 
-1. Clone the repo
+1. Make sure you have [Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) and [FFmpeg](www.ffmpeg.org). 
+
+2. Clone the repo
    ```
    git clone https://github.com/samadii/VidSubExtract-Bot
    ```
 
-2. Install [Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) and [FFmpeg](www.ffmpeg.org). 
-   
 3. Go to [this line](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L11) and add the PATH where Tesseract is installed.
 
 4. Also fill [this path](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L66) with the path of the tessdata folder.
