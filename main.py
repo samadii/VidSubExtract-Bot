@@ -78,10 +78,10 @@ async def main(bot, m):
     if m.document and not m.document.mime_type.startswith("video/"):
         return
     media = m.video or m.document
-    msg = await m.reply("`Downloading..`", parse_mode='md')
+    msg = await m.reply("`Downloading..`")
     c_time = time.time()
     file_dl_path = await bot.download_media(message=m, file_name="temp/vid.mp4", progress=progress_for_pyrogram, progress_args=("Downloading..", msg, c_time))
-    await msg.edit("`Now Extracting..`", parse_mode='md')
+    await msg.edit("`Now Extracting..`")
     if m.video:
         duration = m.video.duration
     else:
@@ -174,7 +174,7 @@ async def main(bot, m):
                 round(percentage, 2)
             )
             try:
-                await msg.edit(progress + "`For cancel progress, send` /cancel", parse_mode='md')
+                await msg.edit(progress + "`For cancel progress, send` /cancel")
             except:
                 pass
 
