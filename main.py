@@ -133,7 +133,7 @@ async def main(bot, m):
         if text != None and text[:1].isspace() == False :
             # Check either text is duplicate or not
             commons = list(set(text.split()) & set(last_text.split()))
-            if (len(commons)==len(text.split())) or ((len(commons) - len(text.split())) <-1):
+            if len(commons) >= len(text.split()) / 2:
                 duplicate = True
                 repeated_count += 1
             else:
