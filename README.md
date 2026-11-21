@@ -61,7 +61,7 @@ The Tesseract language file is downloaded automatically when Tesseract is select
 
 ### Selecting Google Lens
 
-Set `OCR_ENGINE=google_lens` in the deployment environment and restart the bot. At startup, the bot downloads the latest platform-matching Chrome-Lens-OCR release, verifies its SHA-256 digest when GitHub provides one, extracts it, and checks that the CLI executable is present before accepting Telegram messages. The small `py7zip` helper is installed on demand only if it is not already available. The Google Lens binary is cached under `plugins/google_lens` and the downloaded archive under `.plugin_cache`.
+Set `OCR_ENGINE=google_lens` in the deployment environment and restart the bot. At startup, the bot downloads the latest Linux Chrome-Lens-OCR release, verifies its SHA-256 digest when GitHub provides one, extracts it, and checks that the CLI executable is present before accepting Telegram messages. The small `py7zip` helper is installed on demand only if it is not already available. The Google Lens binary is cached under `plugins/google_lens` and the downloaded archive under `.plugin_cache`.
 
 Google Lens processes each sampled frame directly, so this bot does not install the separate PaddleOCR detector/models used by VideOCR's more elaborate detection pipeline. It uses the same sampled-frame interval, SSIM duplicate-frame skipping, crop option, and subtitle collector as Tesseract. Google Lens recognition requires outbound internet access and may be subject to Google's service limits or regional availability. The current Linux release requires glibc 2.35 or newer.
 
