@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
+import re
 import shutil
+import subprocess
 import tempfile
 import time
 from pathlib import Path
@@ -63,14 +64,15 @@ def ensure_tessdata() -> None:
 
 
 def get_video_duration(video_path: str) -> float:
-    result = shutil.which("ffprobe")
-    if not result:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
         raise RuntimeError("ffprobe was not found. Install FFmpeg and make sure it is in PATH.")
 
-    process = __import__("subprocess").run(
+    process = subprocess.run(
         [
-            result, "-v", "error", "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1", video_path,
+            ffprobe, "-v", "error",
+            "-show_entries", "format=duration:stream=codec_type,duration",
+            "-of", "json", video_path,
         ],
         capture_output=True,
         text=True,
@@ -79,8 +81,17 @@ def get_video_duration(video_path: str) -> float:
         raise RuntimeError(process.stderr.strip() or "Could not read video duration.")
 
     try:
-        duration = float(process.stdout.strip())
-    except ValueError as error:
+        import json
+        metadata = json.loads(process.stdout)
+        raw_duration = metadata.get("format", {}).get("duration")
+        if not raw_duration:
+            raw_duration = next(
+                stream.get("duration")
+                for stream in metadata.get("streams", [])
+                if stream.get("codec_type") == "video" and stream.get("duration")
+            )
+        duration = float(raw_duration)
+    except (ValueError, KeyError, StopIteration, TypeError) as error:
         raise RuntimeError("Could not determine the video duration.") from error
 
     if duration <= 0:
@@ -90,10 +101,9 @@ def get_video_duration(video_path: str) -> float:
 
 def display_name(message) -> str:
     media = message.video or message.document
-    name = getattr(media, "file_name", None)
-    if name:
-        return Path(name).stem
-    return f"video_{message.id}"
+    original = getattr(media, "file_name", None)
+    stem = Path(original).stem if original else f"video_{message.id}"
+    return re.sub(r"[^\w.-]+", "_", stem).strip("._") or f"video_{message.id}"
 
 
 @Bot.on_message(filters.command("start"))
@@ -126,15 +136,13 @@ async def extract_video(client, message):
         await message.reply_text("An extraction is already running in this chat. Send /cancel first.")
         return
 
-    media = message.video or message.document
     job_cancel = asyncio.Event()
     ACTIVE_JOBS[chat_id] = job_cancel
     status = await message.reply_text("Downloading video…")
     work_dir = None
-    video_path = None
 
     try:
-        work_dir = tempfile.mkdtemp(prefix=f"job_{chat_id}_", dir=None)
+        work_dir = tempfile.mkdtemp(prefix=f"vidsub_{chat_id}_")
         video_path = await client.download_media(
             message,
             file_name=str(Path(work_dir) / "input_video"),
@@ -143,6 +151,10 @@ async def extract_video(client, message):
         )
         if not video_path:
             raise RuntimeError("Telegram did not return a downloaded video file.")
+
+        if job_cancel.is_set():
+            await status.edit_text("Extraction cancelled.")
+            return
 
         await status.edit_text("Preparing OCR language data…")
         await asyncio.to_thread(ensure_tessdata)
@@ -185,6 +197,10 @@ async def extract_video(client, message):
                     pass
                 last_update = now
 
+        if job_cancel.is_set():
+            await status.edit_text("Extraction cancelled.")
+            return
+
         cues = collector.close(duration_ms)
         if not cues:
             await status.edit_text("No readable subtitles were detected in this video.")
@@ -201,10 +217,11 @@ async def extract_video(client, message):
         )
         await status.delete()
 
-    except asyncio.CancelledError:
-        raise
     except Exception as error:
-        await status.edit_text(f"Extraction failed: {error}")
+        try:
+            await status.edit_text(f"Extraction failed: {error}")
+        except Exception:
+            await message.reply_text(f"Extraction failed: {error}")
     finally:
         ACTIVE_JOBS.pop(chat_id, None)
         if work_dir and Path(work_dir).exists():
