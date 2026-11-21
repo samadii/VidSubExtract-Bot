@@ -7,7 +7,7 @@ import unicodedata
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageChops, ImageOps, ImageStat
 from tesserocr import PyTessBaseAPI, PSM
 
 
@@ -49,6 +49,46 @@ def normalize_text(value: str | None) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def _prepare_ocr_image(source: Image.Image, crop: bool) -> Image.Image:
+    image = source.convert("RGB")
+    if crop:
+        width, height = image.size
+        image = image.crop((width // 10, (height * 2) // 3, width * 9 // 10, height))
+
+    image = ImageOps.grayscale(image)
+    image = ImageOps.autocontrast(image)
+    return image.resize((image.width * 2, image.height * 2), Image.Resampling.LANCZOS)
+
+
+def _comparison_image(image_path: str | Path, crop: bool) -> Image.Image:
+    with Image.open(image_path) as source:
+        image = source.convert("RGB")
+    if crop:
+        width, height = image.size
+        image = image.crop((width // 10, (height * 2) // 3, width * 9 // 10, height))
+    return ImageOps.grayscale(image).resize((96, 54), Image.Resampling.BILINEAR)
+
+
+def structural_similarity(first_path: str | Path, second_path: str | Path, crop: bool = False) -> float:
+    """Return a lightweight SSIM score (0..1) for consecutive sampled frames."""
+    first = _comparison_image(first_path, crop)
+    second = _comparison_image(second_path, crop)
+    mean_a = ImageStat.Stat(first).mean[0] / 255.0
+    mean_b = ImageStat.Stat(second).mean[0] / 255.0
+    var_a = ImageStat.Stat(first).stddev[0] ** 2 / (255.0 ** 2)
+    var_b = ImageStat.Stat(second).stddev[0] ** 2 / (255.0 ** 2)
+    product_mean = ImageStat.Stat(ImageChops.multiply(first, second)).mean[0] / (255.0 ** 2)
+    covariance = product_mean - mean_a * mean_b
+
+    c1 = 0.01 ** 2
+    c2 = 0.03 ** 2
+    numerator = (2 * mean_a * mean_b + c1) * (2 * covariance + c2)
+    denominator = (mean_a ** 2 + mean_b ** 2 + c1) * (var_a + var_b + c2)
+    if denominator == 0:
+        return 1.0 if first.tobytes() == second.tobytes() else 0.0
+    return max(-1.0, min(1.0, numerator / denominator))
+
+
 def _is_same_subtitle(first: str, second: str) -> bool:
     if first == second:
         return True
@@ -83,41 +123,49 @@ def _get_ocr_api(language: str, tessdata_dir: str | None):
     return api
 
 
+def read_subtitle_result(
+    image_path: str | Path,
+    language: str,
+    crop: bool = False,
+    tessdata_dir: str | None = None,
+) -> tuple[str, float]:
+    """Return normalized OCR text and Tesseract's page-level confidence (0..100)."""
+    with Image.open(image_path) as source:
+        image = _prepare_ocr_image(source, crop)
+
+    api = _get_ocr_api(language, tessdata_dir)
+    api.SetImage(image)
+    text = normalize_text(api.GetUTF8Text())
+    try:
+        confidence = float(api.MeanTextConf())
+    except (AttributeError, TypeError, ValueError):
+        confidence = 0.0
+    return text, max(0.0, min(100.0, confidence))
+
+
 def read_subtitle(
     image_path: str | Path,
     language: str,
     crop: bool = False,
     tessdata_dir: str | None = None,
 ) -> str:
-    """OCR one frame using a reusable, thread-local Tesseract API instance."""
-    with Image.open(image_path) as source:
-        image = source.convert("RGB")
-
-    if crop:
-        width, height = image.size
-        image = image.crop((width // 10, (height * 2) // 3, width * 9 // 10, height))
-
-    image = ImageOps.grayscale(image)
-    image = ImageOps.autocontrast(image)
-    image = image.resize((image.width * 2, image.height * 2), Image.Resampling.LANCZOS)
-
-    api = _get_ocr_api(language, tessdata_dir)
-    api.SetImage(image)
-    return normalize_text(api.GetUTF8Text())
+    """Backward-compatible text-only OCR helper."""
+    return read_subtitle_result(image_path, language, crop, tessdata_dir)[0]
 
 
 class SubtitleCollector:
-    """Merge consecutive OCR samples into subtitle cues."""
+    """Merge consecutive OCR samples and retain the strongest reading per cue."""
 
     def __init__(self, sample_interval_ms: int):
         self.sample_interval_ms = sample_interval_ms
         self.cues: list[tuple[int, int, str]] = []
         self.current_text = ""
+        self.current_confidence = -1.0
         self.current_start: int | None = None
         self.last_seen = 0
         self.pending_empty: int | None = None
 
-    def add(self, timestamp_ms: int, text: str) -> None:
+    def add(self, timestamp_ms: int, text: str, confidence: float = 0.0) -> None:
         text = normalize_text(text)
 
         if not text or len(text) < 2:
@@ -128,22 +176,29 @@ class SubtitleCollector:
             return
 
         if not self.current_text:
-            self._start(timestamp_ms, text)
+            self._start(timestamp_ms, text, confidence)
             return
 
         if _is_same_subtitle(self.current_text, text):
             self.last_seen = timestamp_ms
             self.pending_empty = None
-            if len(text) > len(self.current_text):
+            # Prefer the reading with the higher OCR confidence. On a tie,
+            # prefer the more complete text rather than blindly taking the
+            # latest frame.
+            if confidence > self.current_confidence or (
+                confidence == self.current_confidence and len(text) > len(self.current_text)
+            ):
                 self.current_text = text
+                self.current_confidence = confidence
             return
 
         end_ms = self.pending_empty if self.pending_empty is not None else timestamp_ms
         self._finish(end_ms)
-        self._start(timestamp_ms, text)
+        self._start(timestamp_ms, text, confidence)
 
-    def _start(self, timestamp_ms: int, text: str) -> None:
+    def _start(self, timestamp_ms: int, text: str, confidence: float = 0.0) -> None:
         self.current_text = text
+        self.current_confidence = confidence
         self.current_start = timestamp_ms
         self.last_seen = timestamp_ms
         self.pending_empty = None
@@ -155,6 +210,7 @@ class SubtitleCollector:
             if end > start:
                 self.cues.append((start, end, self.current_text))
         self.current_text = ""
+        self.current_confidence = -1.0
         self.current_start = None
         self.pending_empty = None
 
