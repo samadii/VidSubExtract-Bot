@@ -20,7 +20,7 @@ OCR accuracy still depends on subtitle size, contrast, font, language data, and 
 ## Requirements
 
 - Python 3.10+
-- FFmpeg (including ffprobe)
+- A platform supported by `static-ffmpeg` (it downloads FFmpeg and ffprobe automatically on first startup)
 - A platform/Python combination supported by a prebuilt `tesserocr` wheel
 
 Install Python dependencies:
@@ -30,6 +30,8 @@ pip install -r requirements.txt
 ```
 
 The `tesserocr` wheel bundles the Tesseract engine and its native runtime dependencies for supported Linux, macOS, and 64-bit Windows builds. If pip cannot find a compatible wheel, installation may attempt a source build that requires Tesseract and Leptonica development libraries.
+
+`static-ffmpeg` downloads the matching FFmpeg 8.0 and ffprobe binaries on the first bot startup, then adds their directory to `PATH`. You do not need to install FFmpeg separately. The first startup therefore needs outbound network access; supported targets include Linux x86_64 (Ubuntu 20+) and Linux ARM64.
 
 Run locally:
 
@@ -59,7 +61,7 @@ python -m unittest discover -s tests -v
 
 ## Deployment
 
-The repository includes a Procfile and Heroku app configuration. Make sure the deployment environment has FFmpeg (including ffprobe) installed.
+The repository includes a Procfile and Heroku app configuration. FFmpeg and ffprobe are provisioned by `static-ffmpeg` at startup, so the deployment environment does not need a system FFmpeg package. Allow outbound network access on the first startup so the binaries can be downloaded.
 
 ## Source
 
