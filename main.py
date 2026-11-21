@@ -15,7 +15,13 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from display_progress import progress_for_pyrogram
-from subtitle_extractor import (\n    SubtitleCollector, extract_frames, read_subtitle_result, structural_similarity, write_srt,\n)
+from subtitle_extractor import (
+    SubtitleCollector,
+    extract_frames,
+    read_subtitle_result,
+    structural_similarity,
+    write_srt,
+)
 
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -24,6 +30,9 @@ API_HASH = os.environ.get("API_HASH")
 LANG = os.environ.get("SUBTITLE_LANG", "fas").strip() or "fas"
 USE_CROP = os.environ.get("USE_CROP", "").strip().lower() in {"1", "true", "yes", "on"}
 OCR_INTERVAL_MS = max(100, int(os.environ.get("OCR_INTERVAL_MS", "500")))
+FRAME_SSIM_THRESHOLD = float(os.environ.get("FRAME_SSIM_THRESHOLD", "0.997"))
+if not 0.0 <= FRAME_SSIM_THRESHOLD <= 1.0:
+    raise RuntimeError("FRAME_SSIM_THRESHOLD must be between 0.0 and 1.0.")
 TESSDATA_DIR = Path(os.environ.get("TESSDATA_DIR", str(Path(__file__).parent / "tessdata")))
 
 if not BOT_TOKEN or not API_ID or not API_HASH:
@@ -193,6 +202,9 @@ async def extract_video(client, message):
         collector = SubtitleCollector(OCR_INTERVAL_MS)
         total = len(frames)
         last_update = 0.0
+        previous_frame = None
+        previous_text = ""
+        previous_confidence = 0.0
 
         for index, frame_path in enumerate(frames):
             if job_cancel.is_set():
@@ -200,10 +212,26 @@ async def extract_video(client, message):
                 return
 
             timestamp_ms = index * OCR_INTERVAL_MS
-            text = await asyncio.to_thread(
-                read_subtitle, frame_path, LANG, USE_CROP, str(TESSDATA_DIR)
-            )
-            collector.add(timestamp_ms, text)
+            # Skip OCR only when two consecutive sampled images are virtually
+            # identical. Reuse the last reading so subtitle timing remains
+            # continuous even when an OCR call is skipped.
+            is_duplicate_frame = False
+            if previous_frame is not None and FRAME_SSIM_THRESHOLD < 1.0:
+                similarity = await asyncio.to_thread(
+                    structural_similarity, previous_frame, frame_path, USE_CROP
+                )
+                is_duplicate_frame = similarity >= FRAME_SSIM_THRESHOLD
+
+            if is_duplicate_frame:
+                text, confidence = previous_text, previous_confidence
+            else:
+                text, confidence = await asyncio.to_thread(
+                    read_subtitle_result, frame_path, LANG, USE_CROP, str(TESSDATA_DIR)
+                )
+                previous_text, previous_confidence = text, confidence
+
+            previous_frame = frame_path
+            collector.add(timestamp_ms, text, confidence)
 
             now = time.monotonic()
             if now - last_update >= 5 or index + 1 == total:
