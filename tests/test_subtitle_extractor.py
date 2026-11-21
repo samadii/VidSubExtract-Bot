@@ -106,7 +106,6 @@ class SubtitleExtractorTests(unittest.TestCase):
         fake_api = Mock()
         fake_api.GetUTF8Text.return_value = "Recognized text"
         fake_api.MeanTextConf.return_value = 87
-        fake_api.MeanTextConf.return_value = 87
 
         with tempfile.TemporaryDirectory() as directory:
             frame = Path(directory) / "frame.png"
