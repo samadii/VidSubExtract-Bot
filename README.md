@@ -6,6 +6,9 @@ A Telegram bot that extracts hard-coded (burned-in) subtitles from videos and ex
 
 - Extracts sampled frames with **one FFmpeg process**, instead of launching FFmpeg separately for every frame.
 - Uses a configurable sampling interval (default: 500 ms / 2 frames per second).
+- Reuses a thread-local Tesseract OCR engine between frames, avoiding repeated engine initialization and allowing native OCR work to run without holding Python's GIL.
+- Uses prebuilt `tesserocr` wheels that bundle Tesseract and Leptonica on supported platforms; no separate Tesseract executable installation is needed there.
+- Downloads the selected Tesseract language data automatically when missing.
 - Normalizes OCR output and compares nearby samples using text similarity, reducing duplicate subtitle cues.
 - Builds subtitle start/end times from sampled frame timestamps.
 - Uses a separate temporary workspace for each chat, so simultaneous users do not overwrite each other's files.
@@ -18,13 +21,15 @@ OCR accuracy still depends on subtitle size, contrast, font, language data, and 
 
 - Python 3.10+
 - FFmpeg (including ffprobe)
-- Tesseract OCR
+- A platform/Python combination supported by a prebuilt `tesserocr` wheel
 
 Install Python dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
+
+The `tesserocr` wheel bundles the Tesseract engine and its native runtime dependencies for supported Linux, macOS, and 64-bit Windows builds. If pip cannot find a compatible wheel, installation may attempt a source build that requires Tesseract and Leptonica development libraries.
 
 Run locally:
 
@@ -44,7 +49,7 @@ python main.py
 | `USE_CROP` | No | disabled | Set to `1` to focus OCR on the lower subtitle region |
 | `TESSDATA_DIR` | No | `./tessdata` | Directory used for Tesseract language data |
 
-The required Tesseract language file is downloaded automatically on first run.
+The required Tesseract language file is downloaded automatically on first run. Language data is still required even though the OCR engine is bundled in the wheel.
 
 ## Run tests
 
@@ -54,7 +59,7 @@ python -m unittest discover -s tests -v
 
 ## Deployment
 
-The repository includes a Procfile and Heroku app configuration. Make sure the deployment environment has both FFmpeg and Tesseract installed.
+The repository includes a Procfile and Heroku app configuration. Make sure the deployment environment has FFmpeg (including ffprobe) installed.
 
 ## Source
 
