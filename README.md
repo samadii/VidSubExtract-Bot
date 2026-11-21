@@ -9,7 +9,7 @@ A Telegram bot that extracts hard-coded (burned-in) subtitles from videos and ex
 - Reuses a thread-local Tesseract OCR engine between frames, avoiding repeated engine initialization and allowing native OCR work to run without holding Python's GIL.
 - Uses prebuilt `tesserocr` wheels that bundle Tesseract and Leptonica on supported platforms; no separate Tesseract executable installation is needed there.
 - Downloads the selected Tesseract language data automatically when missing.
-- Normalizes OCR output and compares nearby samples using text similarity, reducing duplicate subtitle cues.
+- Compares consecutive sampled frames with a lightweight SSIM implementation and skips OCR only for virtually identical frames, reusing the previous reading so subtitle timing remains continuous.\n- Uses Tesseract's page-level confidence to prefer the strongest OCR reading when multiple similar readings belong to the same subtitle cue.\n- Normalizes OCR output and compares nearby samples using text similarity, reducing duplicate subtitle cues.
 - Builds subtitle start/end times from sampled frame timestamps.
 - Uses a separate temporary workspace for each chat, so simultaneous users do not overwrite each other's files.
 - Adds /cancel support and automatic cleanup of temporary files.
@@ -47,11 +47,11 @@ python main.py
 | `API_ID` | Yes | — | Telegram API ID from my.telegram.org |
 | `API_HASH` | Yes | — | Telegram API hash from my.telegram.org |
 | `SUBTITLE_LANG` | No | `fas` | Tesseract language code, for example `eng` or `fas` |
-| `OCR_INTERVAL_MS` | No | `500` | Time between sampled frames in milliseconds; minimum 100 |
+| `OCR_INTERVAL_MS` | No | `500` | Time between sampled frames in milliseconds; minimum 100 |\n| `FRAME_SSIM_THRESHOLD` | No | `0.997` | Similarity threshold (0.0–1.0) for skipping OCR on virtually identical consecutive frames; set to `1.0` to disable |
 | `USE_CROP` | No | disabled | Set to `1` to focus OCR on the lower subtitle region |
 | `TESSDATA_DIR` | No | `./tessdata` | Directory used for Tesseract language data |
 
-The required Tesseract language file is downloaded automatically on first run. Language data is still required even though the OCR engine is bundled in the wheel.
+The required Tesseract language file is downloaded automatically on first run. Language data is still required even though the OCR engine is bundled in the wheel.\n\nThe optional Google Lens engine from VideOCR is not included. VideOCR's implementation depends on a separate `chrome-lens` executable and a PaddleOCR text-detection pipeline; it is not a drop-in OCR backend or a documented public Google Lens API. Adding it here would introduce a second, externally maintained runtime and a different detection stack rather than simply offering an alternate Tesseract engine.
 
 ## Run tests
 
