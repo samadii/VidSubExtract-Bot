@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-import os
 import re
 import subprocess
 import unicodedata
@@ -41,8 +39,7 @@ def normalize_text(value: str | None) -> str:
         return ""
     value = unicodedata.normalize("NFKC", value)
     value = value.replace("\x0c", " ")
-    value = re.sub(r"\s+", " ", value).strip()
-    return value
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def _is_same_subtitle(first: str, second: str) -> bool:
@@ -58,7 +55,7 @@ def _is_same_subtitle(first: str, second: str) -> bool:
 
     # Short captions need a stricter match to avoid merging unrelated dialogue.
     threshold = 0.82 if min(len(first), len(second)) < 12 else 0.72
-    return ratio >= threshold or (len(union) > 0 and overlap >= 0.72)
+    return ratio >= threshold or (bool(union) and overlap >= 0.72)
 
 
 def read_subtitle(
@@ -116,12 +113,13 @@ class SubtitleCollector:
         if _is_same_subtitle(self.current_text, text):
             self.last_seen = timestamp_ms
             self.pending_empty = None
-            # Keep the clearest/most complete OCR variant for the cue.
             if len(text) > len(self.current_text):
                 self.current_text = text
             return
 
-        self._finish(timestamp_ms)
+        # If one sample was empty, end at that gap rather than extending the old cue.
+        end_ms = self.pending_empty if self.pending_empty is not None else timestamp_ms
+        self._finish(end_ms)
         self._start(timestamp_ms, text)
 
     def _start(self, timestamp_ms: int, text: str) -> None:
