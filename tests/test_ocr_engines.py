@@ -19,7 +19,7 @@ class GoogleLensOutputTests(unittest.TestCase):
 
     def test_parse_plain_text_field(self):
         self.assertEqual(
-            parse_google_lens_output('{"ocr_text":"  سلام\nدنیا  "}'),
+            parse_google_lens_output('{"ocr_text":"  سلام\\nدنیا  "}'),
             "سلام دنیا",
         )
 
