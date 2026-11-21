@@ -42,6 +42,16 @@ class SubtitleExtractorTests(unittest.TestCase):
         self.assertEqual(len(cues), 1)
         self.assertEqual(cues[0][1], 500)
 
+    def test_empty_sample_is_used_as_boundary_before_new_subtitle(self):
+        collector = SubtitleCollector(500)
+        collector.add(0, "First subtitle")
+        collector.add(500, "")
+        collector.add(1000, "Second subtitle")
+        cues = collector.close(1500)
+        self.assertEqual(len(cues), 2)
+        self.assertEqual(cues[0][1], 500)
+        self.assertEqual(cues[1][0], 1000)
+
     def test_timestamp_format(self):
         self.assertEqual(format_timestamp(3_726_045), "01:02:06,045")
 
