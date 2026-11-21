@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 import requests
+import static_ffmpeg
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -63,10 +64,29 @@ def ensure_tessdata() -> None:
     traineddata.write_bytes(response.content)
 
 
+def configure_ffmpeg() -> None:
+    """Download the bundled FFmpeg/ffprobe binaries and put them on PATH."""
+    try:
+        # This is thread-safe and downloads the platform binaries on first use.
+        # Calling it without weak=True makes this project's bundled binaries
+        # take precedence over any system FFmpeg already on PATH.
+        static_ffmpeg.add_paths()
+    except Exception as error:
+        raise RuntimeError(
+            "Could not download or configure static-ffmpeg binaries. "
+            "Check network access and whether this platform is supported."
+        ) from error
+
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        raise RuntimeError(
+            "static-ffmpeg did not expose both ffmpeg and ffprobe on PATH."
+        )
+
+
 def get_video_duration(video_path: str) -> float:
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
-        raise RuntimeError("ffprobe was not found. Install FFmpeg and make sure it is in PATH.")
+        raise RuntimeError("ffprobe is unavailable. static-ffmpeg setup may have failed.")
 
     process = subprocess.run(
         [
@@ -228,4 +248,7 @@ async def extract_video(client, message):
             shutil.rmtree(work_dir, ignore_errors=True)
 
 
+# Prepare FFmpeg once when the bot starts. Both get_video_duration() and
+# extract_frames() then resolve these bundled executables through PATH.
+configure_ffmpeg()
 Bot.run()
