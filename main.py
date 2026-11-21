@@ -15,7 +15,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from display_progress import progress_for_pyrogram
-from subtitle_extractor import SubtitleCollector, extract_frames, read_subtitle, write_srt
+from subtitle_extractor import (\n    SubtitleCollector, extract_frames, read_subtitle_result, structural_similarity, write_srt,\n)
 
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
