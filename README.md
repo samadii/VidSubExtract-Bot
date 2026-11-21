@@ -1,50 +1,61 @@
 # Video Subtitle Extractor Bot
 
-A simple Telegram bot to extract hard-coded subtitle from videos using FFmpeg & Tesseract.
+A Telegram bot that extracts hard-coded (burned-in) subtitles from videos and exports them as an SRT file using FFmpeg and Tesseract OCR.
 
+## Improvements in this branch
 
-Note that the recognition accuracy depends on the subtitle font and its visibility.
+- Extracts sampled frames with **one FFmpeg process**, instead of launching FFmpeg separately for every frame.
+- Uses a configurable sampling interval (default: 500 ms / 2 frames per second).
+- Normalizes OCR output and compares nearby samples using text similarity, reducing duplicate subtitle cues.
+- Builds subtitle start/end times from sampled frame timestamps.
+- Uses a separate temporary workspace for each chat, so simultaneous users do not overwrite each other's files.
+- Adds /cancel support and automatic cleanup of temporary files.
+- Adds tests for subtitle grouping and SRT formatting.
 
-## Deploy to Heroku
+OCR accuracy still depends on subtitle size, contrast, font, language data, and video quality. This bot extracts hard-coded subtitles; it does not extract selectable subtitle tracks embedded in a video container.
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/samadii/VidSubExtract-Bot)
+## Requirements
 
+- Python 3.10+
+- FFmpeg (including ffprobe)
+- Tesseract OCR
 
-## Local Deploying
+Install Python dependencies:
 
-1. Make sure you have [Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) and [FFmpeg](www.ffmpeg.org). 
+```bash
+pip install -r requirements.txt
+```
 
-2. Clone the repo
-   ```
-   git clone https://github.com/samadii/VidSubExtract-Bot
-   ```
+Run locally:
 
-3. Go to [this line](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L11) and add the PATH where Tesseract is installed.
+```bash
+python main.py
+```
 
-4. Also fill [this path](https://github.com/samadii/VidSubExtract-Bot/blob/master/main.py#L66) with the path of the tessdata folder.
-   
-5. Enter the directory
-   ```
-   cd VidSubExtract-Bot
-   ```
-  
-6. Install all requirements using pip.
-   ```
-   pip3 install -r requirements.txt
-   ```
+## Environment variables
 
-7. Run the file
-   ```
-   python3 main.py
-   ```
+| Variable | Required | Default | Description |
+|---|---:|---|---|
+| `BOT_TOKEN` | Yes | — | Telegram bot token from @BotFather |
+| `API_ID` | Yes | — | Telegram API ID from my.telegram.org |
+| `API_HASH` | Yes | — | Telegram API hash from my.telegram.org |
+| `SUBTITLE_LANG` | No | `fas` | Tesseract language code, for example `eng` or `fas` |
+| `OCR_INTERVAL_MS` | No | `500` | Time between sampled frames in milliseconds; minimum 100 |
+| `USE_CROP` | No | disabled | Set to `1` to focus OCR on the lower subtitle region |
+| `TESSDATA_DIR` | No | `./tessdata` | Directory used for Tesseract language data |
 
-## Environment Variables
+The required Tesseract language file is downloaded automatically on first run.
 
-- `API_ID` - Get this from [my.telegram.org](https://my.telegram.org/auth)
-- `API_HASH` - Get this from [my.telegram.org](https://my.telegram.org/auth)
-- `BOT_TOKEN` - Get this from [@BotFather](https://t.me/BotFather)
-- `SUBTITLE_LANG` - Get this from [list of ISO 639-2 language codes](https://en.m.wikipedia.org/wiki/List_of_ISO_639-2_codes)
-- `USE_CROP` - Set this to ANYTHING to enable crop mode(crop out subtitles area).
+## Run tests
 
-### Devs: 
-- [@samadii](https://github.com/samadii)
+```bash
+python -m unittest discover -s tests -v
+```
+
+## Deployment
+
+The repository includes a Procfile and Heroku app configuration. Make sure the deployment environment has both FFmpeg and Tesseract installed.
+
+## Source
+
+Original project: https://github.com/samadii/VidSubExtract-Bot
