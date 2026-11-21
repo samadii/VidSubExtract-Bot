@@ -98,7 +98,7 @@ def _find_executable() -> Path | None:
 
 
 def prepare_google_lens() -> Path:
-    """Download, extract, and verify the latest Linux/Windows Google Lens CLI."""
+    """Download, extract, and verify the latest Linux Google Lens CLI."""
     existing = _find_executable()
     if existing:
         print(f"[ready] Google Lens CLI: {existing}", flush=True)
@@ -108,12 +108,11 @@ def prepare_google_lens() -> Path:
     release = _request_json(GITHUB_RELEASE_API)
     system = platform.system()
 
-    if system == "Linux":
-        suffix = "-Linux.7z"
-    elif system == "Windows":
-        suffix = ".7z"
-    else:
-        raise RuntimeError(f"Google Lens prebuilt CLI is not configured for {system}.")
+    if system != "Linux":
+        raise RuntimeError(
+            f"Google Lens prebuilt CLI is currently supported only on Linux, not {system}."
+        )
+    suffix = "-Linux.7z"
 
     assets = release.get("assets", [])
     asset = next(
