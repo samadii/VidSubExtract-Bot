@@ -52,7 +52,6 @@ python main.py
 | `API_HASH` | Yes | — | Telegram API hash from my.telegram.org |
 | `OCR_ENGINE` | No | `tesseract` | OCR engine: `tesseract` or `google_lens` |
 | `SUBTITLE_LANG` | No | `fas` | Language code for the selected OCR engine. Tesseract codes are converted to BCP-47 for Google Lens (for example `fas` → `fa`, `eng` → `en`). |
-| `GOOGLE_LENS_LANG` | No | `fa` | Google Lens BCP-47 language code, for example `fa` or `en` |
 | `OCR_INTERVAL_MS` | No | `500` | Time between sampled frames in milliseconds; minimum 100 |\n| `FRAME_SSIM_THRESHOLD` | No | `0.997` | Similarity threshold (0.0–1.0) for skipping OCR on virtually identical consecutive frames; set to `1.0` to disable |
 | `USE_CROP` | No | disabled | Set to `1` to focus OCR on the lower subtitle region |
 | `TESSDATA_DIR` | No | `./tessdata` | Directory used for Tesseract language data |
