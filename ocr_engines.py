@@ -160,6 +160,45 @@ def prepare_google_lens() -> Path:
     return executable
 
 
+# Tesseract traineddata codes to BCP-47 tags commonly used by OCR APIs.
+TESSERACT_TO_BCP47 = {
+    "afr": "af", "amh": "am", "ara": "ar", "aze": "az", "bel": "be",
+    "ben": "bn", "bod": "bo", "bos": "bs", "bul": "bg", "cat": "ca",
+    "ceb": "ceb", "ces": "cs", "chi_sim": "zh-Hans", "chi_tra": "zh-Hant",
+    "chr": "chr", "cym": "cy", "dan": "da", "deu": "de", "ell": "el",
+    "eng": "en", "enm": "enm", "epo": "eo", "est": "et", "eus": "eu",
+    "fas": "fa", "fin": "fi", "fra": "fr", "frk": "fr", "frm": "fr",
+    "gle": "ga", "glg": "gl", "grc": "grc", "guj": "gu", "hat": "ht",
+    "heb": "he", "hin": "hi", "hrv": "hr", "hun": "hu", "iku": "iu",
+    "ind": "id", "isl": "is", "ita": "it", "ita_old": "it", "jav": "jv",
+    "jpn": "ja", "kan": "kn", "kat": "ka", "kaz": "kk", "khm": "km",
+    "kir": "ky", "kmr": "ku", "kor": "ko", "lao": "lo", "lat": "la",
+    "lav": "lv", "lit": "lt", "mal": "ml", "mar": "mr", "mkd": "mk",
+    "mlt": "mt", "mon": "mn", "mri": "mi", "msa": "ms", "mya": "my",
+    "nep": "ne", "nld": "nl", "nor": "no", "oci": "oc", "ori": "or",
+    "pan": "pa", "pol": "pl", "por": "pt", "pus": "ps", "ron": "ro",
+    "rus": "ru", "san": "sa", "sin": "si", "slk": "sk", "slv": "sl",
+    "snd": "sd", "spa": "es", "sqi": "sq", "srp": "sr", "swa": "sw",
+    "swe": "sv", "syr": "syr", "tam": "ta", "tat": "tt", "tel": "te",
+    "tgk": "tg", "tha": "th", "tir": "ti", "tur": "tr", "uig": "ug",
+    "ukr": "uk", "urd": "ur", "uzb": "uz", "vie": "vi", "yid": "yi",
+}
+
+
+def tesseract_to_bcp47(language: str) -> str:
+    """Convert a Tesseract language code to a BCP-47 tag."""
+    normalized = language.strip().replace("_", "-")
+    if not normalized:
+        raise ValueError("SUBTITLE_LANG cannot be empty.")
+    code = language.strip().lower()
+    if code in TESSERACT_TO_BCP47:
+        return TESSERACT_TO_BCP47[code]
+    if "-" in normalized or (len(normalized) == 2 and normalized.isalpha()):
+        return normalized
+    # Preserve valid/unknown three-letter subtags rather than guessing.
+    return normalized
+
+
 def parse_google_lens_output(output: str) -> str:
     """Extract recognized words from the JSON format emitted by VideOCR's Lens CLI."""
     for line in output.splitlines():
