@@ -1,6 +1,6 @@
 # Video Subtitle Extractor Bot
 
-A Telegram bot that extracts hard-coded (burned-in) subtitles from videos and exports them as an SRT file using FFmpeg and Tesseract OCR.
+A Telegram bot that extracts hard-coded (burned-in) subtitles from videos and exports them as an SRT file using FFmpeg with Tesseract OCR or optional Google Lens OCR.
 
 ## Improvements in this branch
 
@@ -10,7 +10,8 @@ A Telegram bot that extracts hard-coded (burned-in) subtitles from videos and ex
 - Uses prebuilt `tesserocr` wheels that bundle Tesseract and Leptonica on supported platforms; no separate Tesseract executable installation is needed there.
 - Downloads the selected Tesseract language data automatically when missing.
 - Compares consecutive sampled frames with a lightweight SSIM implementation and skips OCR only for virtually identical frames, reusing the previous reading so subtitle timing remains continuous.
-- Uses Tesseract's page-level confidence to prefer the strongest OCR reading when multiple similar readings belong to the same subtitle cue.
+- Uses Tesseract's page-level confidence to prefer the strongest OCR reading when multiple similar readings belong to the same subtitle cue. Google Lens readings are also supported as an optional alternative engine.
+- Can automatically download and install the selected Google Lens CLI at startup; its binary and the small 7-Zip Python helper are installed only when that engine is selected.
 - Normalizes OCR output and compares nearby samples using text similarity, reducing duplicate subtitle cues.
 - Builds subtitle start/end times from sampled frame timestamps.
 - Uses a separate temporary workspace for each chat, so simultaneous users do not overwrite each other's files.
@@ -23,7 +24,8 @@ OCR accuracy still depends on subtitle size, contrast, font, language data, and 
 
 - Python 3.10+
 - A platform supported by `static-ffmpeg` (it downloads FFmpeg and ffprobe automatically on first startup)
-- A platform/Python combination supported by a prebuilt `tesserocr` wheel
+- A platform/Python combination supported by a prebuilt `tesserocr` wheel when using Tesseract
+- Linux glibc 2.35+ for the current prebuilt Google Lens CLI when using Google Lens
 
 Install Python dependencies:
 
@@ -48,14 +50,20 @@ python main.py
 | `BOT_TOKEN` | Yes | — | Telegram bot token from @BotFather |
 | `API_ID` | Yes | — | Telegram API ID from my.telegram.org |
 | `API_HASH` | Yes | — | Telegram API hash from my.telegram.org |
+| `OCR_ENGINE` | No | `tesseract` | OCR engine: `tesseract` or `google_lens` |
 | `SUBTITLE_LANG` | No | `fas` | Tesseract language code, for example `eng` or `fas` |
+| `GOOGLE_LENS_LANG` | No | `fa` | Google Lens BCP-47 language code, for example `fa` or `en` |
 | `OCR_INTERVAL_MS` | No | `500` | Time between sampled frames in milliseconds; minimum 100 |\n| `FRAME_SSIM_THRESHOLD` | No | `0.997` | Similarity threshold (0.0–1.0) for skipping OCR on virtually identical consecutive frames; set to `1.0` to disable |
 | `USE_CROP` | No | disabled | Set to `1` to focus OCR on the lower subtitle region |
 | `TESSDATA_DIR` | No | `./tessdata` | Directory used for Tesseract language data |
 
-The required Tesseract language file is downloaded automatically on first run. Language data is still required even though the OCR engine is bundled in the wheel.
+The Tesseract language file is downloaded automatically when Tesseract is selected. It is not downloaded when Google Lens is selected.
 
-The optional Google Lens engine from VideOCR is not included. VideOCR's implementation depends on a separate `chrome-lens` executable and a PaddleOCR text-detection pipeline; it is not a drop-in OCR backend or a documented public Google Lens API. Adding it here would introduce a second, externally maintained runtime and a different detection stack rather than simply offering an alternate Tesseract engine.
+### Selecting Google Lens
+
+Set `OCR_ENGINE=google_lens` in the deployment environment and restart the bot. At startup, the bot downloads the latest platform-matching Chrome-Lens-OCR release, verifies its SHA-256 digest when GitHub provides one, extracts it, and checks that the CLI executable is present before accepting Telegram messages. The small `py7zip` helper is installed on demand only if it is not already available. The Google Lens binary is cached under `plugins/google_lens` and the downloaded archive under `.plugin_cache`.
+
+Google Lens processes each sampled frame directly, so this bot does not install the separate PaddleOCR detector/models used by VideOCR's more elaborate detection pipeline. It uses the same sampled-frame interval, SSIM duplicate-frame skipping, crop option, and subtitle collector as Tesseract. Google Lens recognition requires outbound internet access and may be subject to Google's service limits or regional availability. The current Linux release requires glibc 2.35 or newer.
 
 ## Run tests
 
