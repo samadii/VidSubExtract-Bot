@@ -24,8 +24,6 @@ jobs:
           pip install -r requirements.txt
       - name: Verify bundled FFmpeg and ffprobe
         run: |
-          python -c "import shutil, static_ffmpeg; static_ffmpeg.add_paths(); assert shutil.which('ffmpeg'), 'ffmpeg not found on PATH'; assert shutil.which('ffprobe'), 'ffprobe not found on PATH'"
-          ffmpeg -version
-          ffprobe -version
+          python -c "import subprocess, shutil, static_ffmpeg; static_ffmpeg.add_paths(); ffmpeg=shutil.which('ffmpeg'); ffprobe=shutil.which('ffprobe'); assert ffmpeg, 'ffmpeg not found on PATH'; assert ffprobe, 'ffprobe not found on PATH'; subprocess.run([ffmpeg, '-version'], check=True); subprocess.run([ffprobe, '-version'], check=True)"
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
