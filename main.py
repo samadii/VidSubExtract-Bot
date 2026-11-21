@@ -15,7 +15,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from display_progress import progress_for_pyrogram
-from ocr_engines import prepare_google_lens, read_google_lens_subtitle
+from ocr_engines import prepare_google_lens, read_google_lens_subtitle, tesseract_to_bcp47
 from subtitle_extractor import (
     SubtitleCollector,
     extract_frames,
@@ -32,7 +32,6 @@ LANG = os.environ.get("SUBTITLE_LANG", "fas").strip() or "fas"
 OCR_ENGINE = os.environ.get("OCR_ENGINE", "tesseract").strip().lower()
 if OCR_ENGINE not in {"tesseract", "google_lens"}:
     raise RuntimeError("OCR_ENGINE must be either tesseract or google_lens.")
-GOOGLE_LENS_LANG = os.environ.get("GOOGLE_LENS_LANG", "fa").strip() or "fa"
 USE_CROP = os.environ.get("USE_CROP", "").strip().lower() in {"1", "true", "yes", "on"}
 OCR_INTERVAL_MS = max(100, int(os.environ.get("OCR_INTERVAL_MS", "500")))
 FRAME_SSIM_THRESHOLD = float(os.environ.get("FRAME_SSIM_THRESHOLD", "0.997"))
@@ -235,7 +234,7 @@ async def extract_video(client, message):
             else:
                 if OCR_ENGINE == "google_lens":
                     text, confidence = await asyncio.to_thread(
-                        read_google_lens_subtitle, frame_path, GOOGLE_LENS_LANG, USE_CROP
+                        read_google_lens_subtitle, frame_path, tesseract_to_bcp47(LANG), USE_CROP
                     )
                 else:
                     text, confidence = await asyncio.to_thread(
