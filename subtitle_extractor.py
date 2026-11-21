@@ -77,7 +77,7 @@ def structural_similarity(first_path: str | Path, second_path: str | Path, crop:
     mean_b = ImageStat.Stat(second).mean[0] / 255.0
     var_a = ImageStat.Stat(first).stddev[0] ** 2 / (255.0 ** 2)
     var_b = ImageStat.Stat(second).stddev[0] ** 2 / (255.0 ** 2)
-    product_mean = ImageStat.Stat(ImageChops.multiply(first, second)).mean[0] / (255.0 ** 2)
+    product_mean = ImageStat.Stat(ImageChops.multiply(first, second)).mean[0] / 255.0
     covariance = product_mean - mean_a * mean_b
 
     c1 = 0.01 ** 2
