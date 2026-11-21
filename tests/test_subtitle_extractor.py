@@ -11,6 +11,8 @@ from subtitle_extractor import (
     format_timestamp,
     normalize_text,
     read_subtitle,
+    read_subtitle_result,
+    structural_similarity,
     write_srt,
 )
 
@@ -103,6 +105,7 @@ class SubtitleExtractorTests(unittest.TestCase):
     def test_ocr_engine_is_reused_for_frames(self):
         fake_api = Mock()
         fake_api.GetUTF8Text.return_value = "Recognized text"
+        fake_api.MeanTextConf.return_value = 87
         fake_api.MeanTextConf.return_value = 87
 
         with tempfile.TemporaryDirectory() as directory:
