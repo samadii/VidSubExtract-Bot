@@ -15,6 +15,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from display_progress import progress_for_pyrogram
+from ocr_engines import prepare_google_lens, read_google_lens_subtitle
 from subtitle_extractor import (
     SubtitleCollector,
     extract_frames,
@@ -28,6 +29,10 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 API_ID = os.environ.get("API_ID")
 API_HASH = os.environ.get("API_HASH")
 LANG = os.environ.get("SUBTITLE_LANG", "fas").strip() or "fas"
+OCR_ENGINE = os.environ.get("OCR_ENGINE", "tesseract").strip().lower()
+if OCR_ENGINE not in {"tesseract", "google_lens"}:
+    raise RuntimeError("OCR_ENGINE must be either tesseract or google_lens.")
+GOOGLE_LENS_LANG = os.environ.get("GOOGLE_LENS_LANG", "fa").strip() or "fa"
 USE_CROP = os.environ.get("USE_CROP", "").strip().lower() in {"1", "true", "yes", "on"}
 OCR_INTERVAL_MS = max(100, int(os.environ.get("OCR_INTERVAL_MS", "500")))
 FRAME_SSIM_THRESHOLD = float(os.environ.get("FRAME_SSIM_THRESHOLD", "0.997"))
@@ -185,8 +190,11 @@ async def extract_video(client, message):
             await status.edit_text("Extraction cancelled.")
             return
 
-        await status.edit_text("Preparing OCR language data…")
-        await asyncio.to_thread(ensure_tessdata)
+        if OCR_ENGINE == "tesseract":
+            await status.edit_text("Preparing Tesseract language data…")
+            await asyncio.to_thread(ensure_tessdata)
+        else:
+            await status.edit_text("Google Lens OCR is ready.")
 
         duration = await asyncio.to_thread(get_video_duration, video_path)
         duration_ms = int(duration * 1000)
@@ -225,9 +233,14 @@ async def extract_video(client, message):
             if is_duplicate_frame:
                 text, confidence = previous_text, previous_confidence
             else:
-                text, confidence = await asyncio.to_thread(
-                    read_subtitle_result, frame_path, LANG, USE_CROP, str(TESSDATA_DIR)
-                )
+                if OCR_ENGINE == "google_lens":
+                    text, confidence = await asyncio.to_thread(
+                        read_google_lens_subtitle, frame_path, GOOGLE_LENS_LANG, USE_CROP
+                    )
+                else:
+                    text, confidence = await asyncio.to_thread(
+                        read_subtitle_result, frame_path, LANG, USE_CROP, str(TESSDATA_DIR)
+                    )
                 previous_text, previous_confidence = text, confidence
 
             previous_frame = frame_path
@@ -279,4 +292,6 @@ async def extract_video(client, message):
 # Prepare FFmpeg once when the bot starts. Both get_video_duration() and
 # extract_frames() then resolve these bundled executables through PATH.
 configure_ffmpeg()
+if OCR_ENGINE == "google_lens":
+    prepare_google_lens()
 Bot.run()
