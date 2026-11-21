@@ -75,9 +75,9 @@ class SubtitleExtractorTests(unittest.TestCase):
             self.assertIn("00:00:00,000 --> 00:00:01,500", content)
             self.assertIn("Hello", content)
 
-    def test_ocr_engine_is_reused_for_frames(self):
+    def test_collector_prefers_higher_confidence_reading(self):\n        collector = SubtitleCollector(500)\n        collector.add(0, "سلام مایک", 45)\n        collector.add(500, "سلام مایک!", 91)\n        collector.add(1000, "سلام مایک", 62)\n        cues = collector.close(1500)\n        self.assertEqual(len(cues), 1)\n        self.assertEqual(cues[0][2], "سلام مایک!")\n\n    def test_structural_similarity_for_identical_frames(self):\n        with tempfile.TemporaryDirectory() as directory:\n            first = Path(directory) / "first.png"\n            second = Path(directory) / "second.png"\n            Image.new("RGB", (120, 80), "white").save(first)\n            Image.new("RGB", (120, 80), "white").save(second)\n            self.assertAlmostEqual(structural_similarity(first, second), 1.0, places=5)\n\n    def test_structural_similarity_detects_different_frames(self):\n        with tempfile.TemporaryDirectory() as directory:\n            first = Path(directory) / "first.png"\n            second = Path(directory) / "second.png"\n            Image.new("RGB", (120, 80), "white").save(first)\n            Image.new("RGB", (120, 80), "black").save(second)\n            self.assertLess(structural_similarity(first, second), 0.5)\n\n    def test_ocr_engine_is_reused_for_frames(self):
         fake_api = Mock()
-        fake_api.GetUTF8Text.return_value = "Recognized text"
+        fake_api.GetUTF8Text.return_value = "Recognized text"\n        fake_api.MeanTextConf.return_value = 87
 
         with tempfile.TemporaryDirectory() as directory:
             frame = Path(directory) / "frame.png"
