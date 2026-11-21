@@ -62,7 +62,7 @@ def _download_file(url: str, destination: Path, expected_size: int, expected_dig
 
 def _get_py7zip():
     try:
-        module = importlib.import_module("py7zip")
+        module = importlib.import_module("py7zip.py7zip")
     except ImportError:
         print("Installing the small py7zip helper required to unpack Google Lens…", flush=True)
         subprocess.run(
@@ -74,7 +74,7 @@ def _get_py7zip():
 
     if not hasattr(module, "Py7zip"):
         raise RuntimeError(
-            "The installed py7zip package does not expose Py7zip(). "
+            "The installed py7zip package does not expose py7zip.py7zip.Py7zip(). "
             "The pinned 0.8.0 wheel is required to extract the Google Lens archive."
         )
     return module.Py7zip()
