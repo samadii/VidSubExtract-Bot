@@ -70,7 +70,7 @@ def _get_py7zip():
             check=True,
         )
         importlib.invalidate_caches()
-        module = importlib.import_module("py7zip")
+        module = importlib.import_module("py7zip.py7zip")
 
     if not hasattr(module, "Py7zip"):
         raise RuntimeError(
