@@ -1,5 +1,5 @@
 pyrogram
 tgcrypto
 requests
-pytesseract
+tesserocr==2.13.0
 Pillow
