@@ -176,9 +176,9 @@ def format_timestamp(milliseconds: int) -> str:
 
 
 def write_srt(cues: list[tuple[int, int, str]], output_path: str | Path) -> int:
-    with open(output_path, "w", encoding="utf-8-sig", newline="\\n") as output:
+    with open(output_path, "w", encoding="utf-8-sig", newline="\n") as output:
         for index, (start, end, text) in enumerate(cues, start=1):
             output.write(
-                f"{index}\\n{format_timestamp(start)} --> {format_timestamp(end)}\\n{text}\\n\\n"
+                f"{index}\n{format_timestamp(start)} --> {format_timestamp(end)}\n{text}\n\n"
             )
     return len(cues)
