@@ -1,8 +1,8 @@
 # Video Subtitle Extractor Bot
 
-A Telegram bot that extracts hard-coded (burned-in) subtitles from videos and exports them as an SRT file using FFmpeg with Tesseract OCR or optional Google Lens OCR.
+A Telegram bot that extracts hard-coded (burned-in) subtitles from videos and exports them as an SRT file using FFmpeg with Tesseract OCR and optional Google Lens OCR.
 
-## Improvements in this branch
+## Included
 
 - Extracts sampled frames with **one FFmpeg process**, instead of launching FFmpeg separately for every frame.
 - Uses a configurable sampling interval (default: 500 ms / 2 frames per second).
@@ -25,7 +25,7 @@ OCR accuracy still depends on subtitle size, contrast, font, language data, and 
 - Python 3.10+
 - A platform supported by `static-ffmpeg` (it downloads FFmpeg and ffprobe automatically on first startup)
 - A platform/Python combination supported by a prebuilt `tesserocr` wheel when using Tesseract
-- Linux glibc 2.35+ for the current prebuilt Google Lens CLI when using Google Lens
+- if deploying is on Linux, requires glibc 2.35+ when using Google Lens.
 
 Install Python dependencies:
 
@@ -35,8 +35,7 @@ pip install -r requirements.txt
 
 The `tesserocr` wheel bundles the Tesseract engine and its native runtime dependencies for supported Linux, macOS, and 64-bit Windows builds. If pip cannot find a compatible wheel, installation may attempt a source build that requires Tesseract and Leptonica development libraries.
 
-`static-ffmpeg` downloads the matching FFmpeg 8.0 and ffprobe binaries on the first bot startup, then adds their directory to `PATH`. You do not need to install FFmpeg separately. The first startup therefore needs outbound network access; supported targets include Linux x86_64 (Ubuntu 20+) and Linux ARM64.
-
+`static-ffmpeg` downloads the matching FFmpeg 8.0 and ffprobe binaries on the first bot startup, then adds their directory to `PATH`. You do not need to install FFmpeg separately.
 Run locally:
 
 ```bash
@@ -58,21 +57,15 @@ python main.py
 
 The Tesseract language file is downloaded automatically when Tesseract is selected. It is not downloaded when Google Lens is selected.
 
-### Selecting Google Lens
+### Selecting OCR ENGINE
 
-Google Lens is selected by default. To use Tesseract instead, set `OCR_ENGINE=tesseract` in the deployment environment and restart the bot. At startup, the bot downloads the latest Linux Chrome-Lens-OCR release, verifies its SHA-256 digest when GitHub provides one, extracts it, and checks that the CLI executable is present before accepting Telegram messages. The small `py7zip` helper is installed on demand only if it is not already available. The Google Lens binary is cached under `plugins/google_lens` and the downloaded archive under `.plugin_cache`.
-
-Google Lens processes each sampled frame directly, so this bot does not install the separate PaddleOCR detector/models used by VideOCR's more elaborate detection pipeline. It uses the same sampled-frame interval, SSIM duplicate-frame skipping, crop option, and subtitle collector as Tesseract. Google Lens recognition requires outbound internet access and may be subject to Google's service limits or regional availability. The current Linux release requires glibc 2.35 or newer.
+Google Lens is selected by default. To use Tesseract instead, set `OCR_ENGINE=tesseract` in the deployment environment and restart the bot. At startup, the bot downloads the latest Chrome-Lens-OCR release, verifies its SHA-256 digest when GitHub provides one, extracts it, and checks that the CLI executable is present before accepting Telegram messages. The small `py7zip` helper is installed on demand only if it is not already available. The Google Lens binary is cached under `plugins/google_lens` and the downloaded archive under `.plugin_cache`.
 
 ## Run tests
 
 ```bash
 python -m unittest discover -s tests -v
 ```
-
-## Deployment
-
-The repository includes a Procfile and Heroku app configuration. FFmpeg and ffprobe are provisioned by `static-ffmpeg` at startup, so the deployment environment does not need a system FFmpeg package. Allow outbound network access on the first startup so the binaries can be downloaded.
 
 ## Source
 
