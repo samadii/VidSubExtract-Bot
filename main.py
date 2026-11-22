@@ -29,7 +29,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 API_ID = os.environ.get("API_ID")
 API_HASH = os.environ.get("API_HASH")
 LANG = os.environ.get("SUBTITLE_LANG", "fas").strip() or "fas"
-OCR_ENGINE = os.environ.get("OCR_ENGINE", "tesseract").strip().lower()
+OCR_ENGINE = os.environ.get("OCR_ENGINE", "google_lens").strip().lower()
 if OCR_ENGINE not in {"tesseract", "google_lens"}:
     raise RuntimeError("OCR_ENGINE must be either tesseract or google_lens.")
 USE_CROP = os.environ.get("USE_CROP", "").strip().lower() in {"1", "true", "yes", "on"}
