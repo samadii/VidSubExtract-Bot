@@ -1,204 +1,296 @@
+from __future__ import annotations
+
+import asyncio
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+
 import requests
-import os, datetime, json, time, math, subprocess
-import pytesseract
-from display_progress import progress_for_pyrogram
+import static_ffmpeg
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from PIL import Image
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+from display_progress import progress_for_pyrogram
+from ocr_engines import prepare_google_lens, read_google_lens_subtitle, tesseract_to_bcp47
+from subtitle_extractor import (
+    SubtitleCollector,
+    extract_frames,
+    read_subtitle_result,
+    structural_similarity,
+    write_srt,
+)
 
 
-
-#pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
-# config vars
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 API_ID = os.environ.get("API_ID")
 API_HASH = os.environ.get("API_HASH")
-LANG = os.environ.get("SUBTITLE_LANG") #Get this from https://en.m.wikipedia.org/wiki/List_of_ISO_639-2_codes
-USE_CROP = os.environ.get("USE_CROP") #[Optional] Set to ANYTHING to enable crop mode
+LANG = os.environ.get("SUBTITLE_LANG", "fas").strip() or "fas"
+OCR_ENGINE = os.environ.get("OCR_ENGINE", "google_lens").strip().lower()
+if OCR_ENGINE not in {"tesseract", "google_lens"}:
+    raise RuntimeError("OCR_ENGINE must be either tesseract or google_lens.")
+USE_CROP = os.environ.get("USE_CROP", "").strip().lower() in {"1", "true", "yes", "on"}
+OCR_INTERVAL_MS = max(100, int(os.environ.get("OCR_INTERVAL_MS", "500")))
+FRAME_SSIM_THRESHOLD = float(os.environ.get("FRAME_SSIM_THRESHOLD", "0.997"))
+if not 0.0 <= FRAME_SSIM_THRESHOLD <= 1.0:
+    raise RuntimeError("FRAME_SSIM_THRESHOLD must be between 0.0 and 1.0.")
+TESSDATA_DIR = Path(os.environ.get("TESSDATA_DIR", str(Path(__file__).parent / "tessdata")))
+
+if not BOT_TOKEN or not API_ID or not API_HASH:
+    raise RuntimeError("BOT_TOKEN, API_ID and API_HASH environment variables are required.")
 
 Bot = Client(
     "VidSubExtract-Bot",
-    bot_token = BOT_TOKEN,
-    api_id = API_ID,
-    api_hash = API_HASH
+    bot_token=BOT_TOKEN,
+    api_id=int(API_ID),
+    api_hash=API_HASH,
 )
 
-START_TXT = """
-Hi {}
-I am Subtitle Extractor Bot.
+START_TEXT = (
+    "Hi {mention}!\n"
+    "I can extract hard-coded subtitles from videos and create an SRT file.\n\n"
+    "Send me a video to get started.\n"
+    "Use /cancel to stop an active extraction."
+)
+START_BUTTONS = InlineKeyboardMarkup(
+    [[InlineKeyboardButton("Source Code", url="https://github.com/samadii/VidSubExtract-Bot")]]
+)
 
-> `I can extract hard-coded subtitle from videos.`
-
-Send me a video to get started.
-"""
-
-START_BTN = InlineKeyboardMarkup(
-        [[
-        InlineKeyboardButton("Source Code", url="https://github.com/samadii/VidSubExtract-Bot"),
-        ]]
-    )
+# Each chat gets its own workspace and cancellation event.
+ACTIVE_JOBS: dict[int, asyncio.Event] = {}
 
 
-@Bot.on_message(filters.command(["start"]))
-async def start(bot, update):
-    text = START_TXT.format(update.from_user.mention)
-    reply_markup = START_BTN
-    await update.reply_text(
-        text=text,
-        disable_web_page_preview=True,
-        reply_markup=reply_markup
-    )
+def ensure_tessdata() -> None:
+    TESSDATA_DIR.mkdir(parents=True, exist_ok=True)
+    traineddata = TESSDATA_DIR / f"{LANG}.traineddata"
+    if traineddata.exists() and traineddata.stat().st_size > 0:
+        return
 
-@Bot.on_message(filters.command(["cancel"]))
-async def cancel_progress(_, m):
+    url = f"https://github.com/tesseract-ocr/tessdata/raw/main/{LANG}.traineddata"
+    response = requests.get(url, timeout=60, headers={"User-Agent": "VidSubExtract-Bot"})
+    response.raise_for_status()
+    if not response.content:
+        raise RuntimeError(f"Tesseract language data for '{LANG}' is empty.")
+    traineddata.write_bytes(response.content)
+
+
+def configure_ffmpeg() -> None:
+    """Download the bundled FFmpeg/ffprobe binaries and put them on PATH."""
     try:
-        os.remove("temp/vid.mp4")
-    except:
-        await m.reply("can't cancel. maybe there wasn't any progress in process.")
-    else:
-        await m.reply("canceled successfully.")
-    await m.delete()
-    os.remove("temp/srt.srt")
+        # This is thread-safe and downloads the platform binaries on first use.
+        # Calling it without weak=True makes this project's bundled binaries
+        # take precedence over any system FFmpeg already on PATH.
+        static_ffmpeg.add_paths()
+    except Exception as error:
+        raise RuntimeError(
+            "Could not download or configure static-ffmpeg binaries. "
+            "Check network access and whether this platform is supported."
+        ) from error
 
-#language data for ocr
-tessdata = f"https://github.com/tesseract-ocr/tessdata/raw/main/{LANG}.traineddata"
-dirs = r"/app/vendor/tessdata"
-path = os.path.join(dirs, f"{LANG}.traineddata")
-if not os.path.exists(path):
-    data = requests.get(tessdata, allow_redirects=True, headers={"User-Agent": "Mozilla/5.0"})
-    if data.status_code == 200:
-        open(path, "wb").write(data.content)
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        raise RuntimeError(
+            "static-ffmpeg did not expose both ffmpeg and ffprobe on PATH."
+        )
+
+
+def get_video_duration(video_path: str) -> float:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise RuntimeError("ffprobe is unavailable. static-ffmpeg setup may have failed.")
+
+    process = subprocess.run(
+        [
+            ffprobe, "-v", "error",
+            "-show_entries", "format=duration:stream=codec_type,duration",
+            "-of", "json", video_path,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if process.returncode != 0:
+        raise RuntimeError(process.stderr.strip() or "Could not read video duration.")
+
+    try:
+        import json
+        metadata = json.loads(process.stdout)
+        raw_duration = metadata.get("format", {}).get("duration")
+        if not raw_duration:
+            raw_duration = next(
+                stream.get("duration")
+                for stream in metadata.get("streams", [])
+                if stream.get("codec_type") == "video" and stream.get("duration")
+            )
+        duration = float(raw_duration)
+    except (ValueError, KeyError, StopIteration, TypeError) as error:
+        raise RuntimeError("Could not determine the video duration.") from error
+
+    if duration <= 0:
+        raise RuntimeError("The video has an invalid duration.")
+    return duration
+
+
+def display_name(message) -> str:
+    media = message.video or message.document
+    original = getattr(media, "file_name", None)
+    stem = Path(original).stem if original else f"video_{message.id}"
+    return re.sub(r"[^\w.-]+", "_", stem).strip("._") or f"video_{message.id}"
+
+
+@Bot.on_message(filters.command("start"))
+async def start(_, message):
+    mention = message.from_user.mention if message.from_user else "there"
+    await message.reply_text(
+        START_TEXT.format(mention=mention),
+        reply_markup=START_BUTTONS,
+        disable_web_page_preview=True,
+    )
+
+
+@Bot.on_message(filters.command("cancel") & filters.private)
+async def cancel(_, message):
+    event = ACTIVE_JOBS.get(message.chat.id)
+    if event:
+        event.set()
+        await message.reply_text("Cancellation requested. The current step will stop shortly.")
     else:
-        print("Either the lang code is wrong or the lang is not supported.")
+        await message.reply_text("There is no active extraction to cancel.")
 
 
 @Bot.on_message(filters.private & (filters.video | filters.document))
-async def main(bot, m):
-    if m.document and not m.document.mime_type.startswith("video/"):
+async def extract_video(client, message):
+    if message.document and not (message.document.mime_type or "").startswith("video/"):
         return
-    media = m.video or m.document
-    msg = await m.reply("`Downloading..`")
-    c_time = time.time()
-    file_dl_path = await bot.download_media(message=m, file_name="temp/vid.mp4", progress=progress_for_pyrogram, progress_args=("Downloading..", msg, c_time))
-    await msg.edit_text("`Now Extracting..`")
-    if m.video:
-        duration = m.video.duration
-    else:
-        video_info = subprocess.check_output(f'ffprobe -v quiet -show_streams -select_streams v:0 -of json "{file_dl_path}"', shell=True).decode()
-        fields = json.loads(video_info)['streams'][0]
-        duration = int(fields['duration'].split(".")[0])
-    sub_count = 0
-    repeated_count = 0
-    last_text = " "
-    duplicate = True
-    lastsub_time = 0
-    time_to_finish = duration
-    intervals = get_intervals(duration)
-    # Extract frames every 100 milliseconds for ocr
-    for interval in intervals:
-        command = os.system(f'ffmpeg -ss {ms_to_time(interval)} -i "{file_dl_path}" -pix_fmt yuvj422p -vframes 1 -q:v 2 -y temp/output.jpg')
-        if command != 0:
-            await msg.delete()
+
+    chat_id = message.chat.id
+    if chat_id in ACTIVE_JOBS:
+        await message.reply_text("An extraction is already running in this chat. Send /cancel first.")
+        return
+
+    job_cancel = asyncio.Event()
+    ACTIVE_JOBS[chat_id] = job_cancel
+    status = await message.reply_text("Downloading video…")
+    work_dir = None
+
+    try:
+        work_dir = tempfile.mkdtemp(prefix=f"vidsub_{chat_id}_")
+        video_path = await client.download_media(
+            message,
+            file_name=str(Path(work_dir) / "input_video"),
+            progress=progress_for_pyrogram,
+            progress_args=("Downloading…", status, time.time()),
+        )
+        if not video_path:
+            raise RuntimeError("Telegram did not return a downloaded video file.")
+
+        if job_cancel.is_set():
+            await status.edit_text("Extraction cancelled.")
             return
 
-        try:
-            #Probably makes better recognition
-            """
-            import cv2  #Install opencv-python
-            img = cv2.imread("temp/output.jpg")
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2LUV)
-            cv2.imwrite("temp/output.jpg", img)
-            import PIL.ImageOps
-            img = PIL.ImageOps.invert(img)
-            img.save("temp/output.jpg")
-            """
-            if USE_CROP:
-                img = Image.open("temp/output.jpg")
-                width, height = img.size
-                x1 = width // 7
-                y1 = 3 * (height // 4)
-                x2 = 6 * (width // 7)
-                y2 = height
-                crop_area = (x1, y1, x2, y2)
-                cropped = img.crop(crop_area) # Learn how to change crop parameters: https://stackoverflow.com/a/39424357
-                #cropped.show()
-                cropped.save("temp/output.jpg")
-            text = pytesseract.image_to_string("temp/output.jpg", LANG)
-        except Exception as e:
-            print(e)
-            text = None
-            pass
+        if OCR_ENGINE == "tesseract":
+            await status.edit_text("Preparing Tesseract language data…")
+            await asyncio.to_thread(ensure_tessdata)
+        else:
+            await status.edit_text("Google Lens OCR is ready.")
 
-        if text != None and text[:1].isspace() == False :
-            # Check either text is duplicate or not
-            commons = list(set(text.split()) & set(last_text.split()))
-            if len(commons) >= len(text.split()) / 2:
-                duplicate = True
-                repeated_count += 1
+        duration = await asyncio.to_thread(get_video_duration, video_path)
+        duration_ms = int(duration * 1000)
+        frames_dir = Path(work_dir) / "frames"
+
+        await status.edit_text("Extracting frames with FFmpeg…")
+        frames = await asyncio.to_thread(
+            extract_frames, video_path, str(frames_dir), OCR_INTERVAL_MS
+        )
+        if not frames:
+            raise RuntimeError("FFmpeg did not produce any frames.")
+
+        collector = SubtitleCollector(OCR_INTERVAL_MS)
+        total = len(frames)
+        last_update = 0.0
+        previous_frame = None
+        previous_text = ""
+        previous_confidence = 0.0
+
+        for index, frame_path in enumerate(frames):
+            if job_cancel.is_set():
+                await status.edit_text("Extraction cancelled.")
+                return
+
+            timestamp_ms = index * OCR_INTERVAL_MS
+            # Skip OCR only when two consecutive sampled images are virtually
+            # identical. Reuse the last reading so subtitle timing remains
+            # continuous even when an OCR call is skipped.
+            is_duplicate_frame = False
+            if previous_frame is not None and FRAME_SSIM_THRESHOLD < 1.0:
+                similarity = await asyncio.to_thread(
+                    structural_similarity, previous_frame, frame_path, USE_CROP
+                )
+                is_duplicate_frame = similarity >= FRAME_SSIM_THRESHOLD
+
+            if is_duplicate_frame:
+                text, confidence = previous_text, previous_confidence
             else:
-                duplicate = False
+                if OCR_ENGINE == "google_lens":
+                    text, confidence = await asyncio.to_thread(
+                        read_google_lens_subtitle, frame_path, tesseract_to_bcp47(LANG), USE_CROP
+                    )
+                else:
+                    text, confidence = await asyncio.to_thread(
+                        read_subtitle_result, frame_path, LANG, USE_CROP, str(TESSDATA_DIR)
+                    )
+                previous_text, previous_confidence = text, confidence
 
-            # to store start-time of the lastest dialogue
-            if duplicate == False:
-                lastsub_time = interval
-                
-            # Write the dialogues text
-            if repeated_count != 0 and duplicate == False:
-                sub_count += 1
-                from_time = ms_to_time(interval-100-(repeated_count*100))
-                to_time = ms_to_time(interval)
-                f = open("temp/srt.srt", "a+", encoding="utf-8")
-                f.write(str(sub_count) + "\n" + from_time + " --> " + to_time + "\n" + last_text + "\n\n")
-                duplicate = True
-                repeated_count = 0
-            last_text = text
+            previous_frame = frame_path
+            collector.add(timestamp_ms, text, confidence)
 
-        # Write the last dialogue
-        if interval/1000 == duration:
-            ftime = ms_to_time(lastsub_time)
-            ttime = ms_to_time(lastsub_time+10000)
-            f = open("temp/srt.srt", "a+", encoding="utf-8")
-            f.write(str(sub_count+1) + "\n" + ftime + " --> " + ttime + "\n" + last_text + "\n\n")
+            now = time.monotonic()
+            if now - last_update >= 5 or index + 1 == total:
+                percentage = (index + 1) * 100 / total
+                try:
+                    await status.edit_text(
+                        f"Recognizing subtitles… {percentage:.1f}% "
+                        f"({index + 1}/{total} frames)"
+                    )
+                except Exception:
+                    pass
+                last_update = now
 
-        # progress bar
-        if time_to_finish > 0:
-            time_to_finish -= 0.1
-            percentage = (duration - time_to_finish) * 100 / duration
-            progress = "`Processing...`\n[{0}{1}]\nPercentage : {2}%\n\n".format(
-                ''.join(["●" for i in range(math.floor(percentage / 5))]),
-                ''.join(["○" for i in range(20 - math.floor(percentage / 5))]),
-                round(percentage, 2)
-            )
-            try:
-                await msg.edit_text(progress + "`For cancel progress, send` /cancel")
-            except:
-                pass
+        if job_cancel.is_set():
+            await status.edit_text("Extraction cancelled.")
+            return
 
-    f.close
-    try:
-        await bot.send_document(chat_id=m.chat.id, document="temp/srt.srt" , file_name=media.file_name.rsplit('.', 1)[0]+".srt")
-    except ValueError:
-        await msg.edit_text("Not any text detected.")
-    else:
-        await msg.delete()
-    os.remove(file_dl_path)
-    os.remove("temp/srt.srt")
+        cues = collector.close(duration_ms)
+        if not cues:
+            await status.edit_text("No readable subtitles were detected in this video.")
+            return
 
+        output_path = Path(work_dir) / f"{display_name(message)}.srt"
+        write_srt(cues, output_path)
 
-def get_intervals(duration):
-    intervals = []
-    for i in range(0, duration+1):
-        for x in range(0, 10):
-            interval = (i+(x/10))*1000
-            intervals.append(interval)
-    return intervals
+        await client.send_document(
+            chat_id=chat_id,
+            document=str(output_path),
+            file_name=f"{display_name(message)}.srt",
+            caption=f"Subtitle extraction completed. Found {len(cues)} subtitle cues.",
+        )
+        await status.delete()
+
+    except Exception as error:
+        try:
+            await status.edit_text(f"Extraction failed: {error}")
+        except Exception:
+            await message.reply_text(f"Extraction failed: {error}")
+    finally:
+        ACTIVE_JOBS.pop(chat_id, None)
+        if work_dir and Path(work_dir).exists():
+            shutil.rmtree(work_dir, ignore_errors=True)
 
 
-def ms_to_time(interval):
-    ms2time = "0" + str(datetime.timedelta(milliseconds=interval))[:11]
-    ms2time = f"{ms2time}.000" if not "." in ms2time else ms2time
-    return ms2time
-
-
+# Prepare FFmpeg once when the bot starts. Both get_video_duration() and
+# extract_frames() then resolve these bundled executables through PATH.
+configure_ffmpeg()
+if OCR_ENGINE == "google_lens":
+    prepare_google_lens()
 Bot.run()

@@ -1,0 +1,29 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - improve/ocr-performance
+  pull_request:
+    branches:
+      - improve/ocr-performance
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Verify bundled FFmpeg and ffprobe
+        run: |
+          python -c "import subprocess, shutil, static_ffmpeg; static_ffmpeg.add_paths(); ffmpeg=shutil.which('ffmpeg'); ffprobe=shutil.which('ffprobe'); assert ffmpeg, 'ffmpeg not found on PATH'; assert ffprobe, 'ffprobe not found on PATH'; subprocess.run([ffmpeg, '-version'], check=True); subprocess.run([ffprobe, '-version'], check=True)"
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v

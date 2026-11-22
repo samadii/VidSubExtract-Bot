@@ -1,5 +1,6 @@
 pyrogram
 tgcrypto
 requests
-pytesseract
+static-ffmpeg
+tesserocr==2.13.0
 Pillow
