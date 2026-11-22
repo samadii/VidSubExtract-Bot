@@ -36,6 +36,7 @@ pip install -r requirements.txt
 The `tesserocr` wheel bundles the Tesseract engine and its native runtime dependencies for supported Linux, macOS, and 64-bit Windows builds. If pip cannot find a compatible wheel, installation may attempt a source build that requires Tesseract and Leptonica development libraries.
 
 `static-ffmpeg` downloads the matching FFmpeg 8.0 and ffprobe binaries on the first bot startup, then adds their directory to `PATH`. You do not need to install FFmpeg separately.
+
 Run locally:
 
 ```bash
