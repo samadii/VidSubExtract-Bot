@@ -56,7 +56,7 @@ START_TEXT = (
     "Use /cancel to stop an active extraction."
 )
 START_BUTTONS = InlineKeyboardMarkup(
-    [[InlineKeyboardButton("Source Code", url="https://github.com/Soebb/VidSubExtract-Bot")]]
+    [[InlineKeyboardButton("Source Code", url="https://github.com/samadii/VidSubExtract-Bot")]]
 )
 
 # Each chat gets its own workspace and cancellation event.
