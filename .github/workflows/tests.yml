@@ -3,10 +3,10 @@ name: Tests
 on:
   push:
     branches:
-      - improve/ocr-performance
+      - master
   pull_request:
     branches:
-      - improve/ocr-performance
+      - master
 
 jobs:
   unit-tests:
